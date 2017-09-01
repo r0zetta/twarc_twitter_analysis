@@ -3,4 +3,5 @@ log_network_data = 1
 dump_interarrivals = 1
 log_all_userinfo = 0
 dump_timeline_data = 0
-dump_raw_data = 0
+dump_raw_data = 1
+dump_graphs = 0
