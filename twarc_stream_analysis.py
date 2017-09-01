@@ -460,9 +460,12 @@ def get_all_associations(link_type):
                     ret[name] = stuff[link_type]
     return ret
 
-def increment_heatmap(name, week, weekday, hour):
+def increment_heatmap(name, tweet_time_object):
     debug_print(sys._getframe().f_code.co_name)
     global data
+    week = tweet_time_object.strftime("%Y%W")
+    weekday = tweet_time_object.weekday()
+    hour = tweet_time_object.hour
     category = "heatmaps"
     if category not in data:
         data[category] = {}
@@ -1877,10 +1880,6 @@ def process_tweet(status):
     tweet_time_object = time_string_to_object(info["tweet_time_readable"])
     info["tweet_time_unix"] = time_object_to_unix(tweet_time_object)
     info["datestring"] = tweet_time_object.strftime("%Y%m%d%H")
-    week = tweet_time_object.strftime("%Y%W")
-    week_number = int(tweet_time_object.strftime("%W"))
-    weekday = tweet_time_object.weekday()
-    hour = tweet_time_object.hour
 
     info["lang"] = status["lang"]
     info["tweet_id"] = status["id_str"]
@@ -1889,8 +1888,8 @@ def process_tweet(status):
     if info["lang"] is None or info["name"] is None or info["text"] is None or info["tweet_id"] is None:
         return
 
-    increment_heatmap("all_tweets", week, weekday, hour)
-    increment_heatmap("tweets_" + info["lang"], week, weekday, hour)
+    increment_heatmap("all_tweets", tweet_time_object)
+    increment_heatmap("tweets_" + info["lang"], tweet_time_object)
     add_timeline_data(info["tweet_time_readable"], info["name"], "tweeted", info["text"], info["tweet_id"])
     add_data("users", "all_users", info["name"])
     increment_per_hour("all_users", info["datestring"], info["name"])
@@ -1956,7 +1955,7 @@ def process_tweet(status):
         info["retweeted_name"] = status["retweeted_screen_name"]
         if info["retweeted_name"] is not None:
             add_data("users", "retweeters", info["name"])
-            increment_heatmap("retweets", week, weekday, hour)
+            increment_heatmap("retweets", tweet_time_object)
             increment_per_hour("retweeters", info["datestring"], info["name"])
             add_graphing_data("retweets", info["name"], info["retweeted_name"])
             add_timeline_data(info["tweet_time_readable"], info["name"], "retweeted", info["retweeted_name"], info["tweet_id"])
@@ -1986,7 +1985,7 @@ def process_tweet(status):
                     if t == ta:
                         increment_counter("target_" + ta)
                         add_data("metadata", "targets", ta)
-                        increment_heatmap("target_" + ta, week, weekday, hour)
+                        increment_heatmap("target_" + ta, tweet_time_object)
                         increment_per_hour("targets", info["datestring"], ta)
                 if add_data("metadata", label, t) is True:
                     increment_counter("tweet_words_seen")
@@ -1996,7 +1995,7 @@ def process_tweet(status):
             for w in pos_words:
                 add_data("metadata", "positive_words", w)
                 increment_per_hour("positive_words", info["datestring"], w)
-                increment_heatmap("positive_words", week, weekday, hour)
+                increment_heatmap("positive_words", tweet_time_object)
                 increment_counter("positive_words")
         neg_words = get_negative_words(tokens)
         info["negative_words"] = len(neg_words)
@@ -2004,7 +2003,7 @@ def process_tweet(status):
             for w in neg_words:
                 add_data("metadata", "negative_words", w)
                 increment_per_hour("negative_words", info["datestring"], w)
-                increment_heatmap("negative_words", week, weekday, hour)
+                increment_heatmap("negative_words", tweet_time_object)
                 increment_counter("negative_words")
         info["negative_words"] += get_userinfo_value("all_users", info["name"], "negative_words")
         info["positive_words"] += get_userinfo_value("all_users", info["name"], "positive_words")
@@ -2032,7 +2031,7 @@ def process_tweet(status):
                     for h in conf["settings"]["monitored_hashtags"]:
                         if h in t:
                             label = "monitored_" + h + "_hashtag"
-                            increment_heatmap(label, week, weekday, hour)
+                            increment_heatmap(label, tweet_time_object)
                             add_data("users", label + "_tweeters", info["name"])
                             increment_per_hour(label + "_tweeters", info["datestring"], info["name"])
                             increment_per_hour(label + "_tweets", info["datestring"], info["text"])
@@ -2068,7 +2067,7 @@ def process_tweet(status):
                     increment_per_hour("all_urls", info["datestring"], u)
                     add_timeline_data(info["tweet_time_readable"], info["name"], "tweeted url", u, info["tweet_id"])
                     if "twitter.com" not in u:
-                        increment_heatmap("urls_not_twitter", week, weekday, hour)
+                        increment_heatmap("urls_not_twitter", tweet_time_object)
                         add_data("metadata", "urls_not_twitter", u)
                         increment_per_hour("urls_not_twitter", info["datestring"], u)
                     for k in conf["settings"]["url_keywords"]:
@@ -2081,10 +2080,10 @@ def process_tweet(status):
                             increment_counter(label + "_tweets")
                             add_data("users", label + "_tweeter", info["name"])
                             add_timeline_data(info["tweet_time_readable"], info["name"], "tweeted keyword url about", k, info["tweet_id"])
-                            increment_heatmap("keyword_urls", week, weekday, hour)
+                            increment_heatmap("keyword_urls", tweet_time_object)
                     for f in conf["corpus"]["fake_news_sources"]:
                         if f in u:
-                            increment_heatmap("fake_news", week, weekday, hour)
+                            increment_heatmap("fake_news", tweet_time_object)
                             increment_counter("fake_news_tweets")
                             increment_per_hour("fake_news_urls", info["datestring"], u)
                             increment_per_hour("fake_news_tweeters", info["datestring"], info["name"])
@@ -2114,7 +2113,7 @@ def process_tweet(status):
         for k in conf["settings"]["keywords"]:
             if k in info["text"]:
                 label = "keyword_" + k
-                increment_heatmap(label, week, weekday, hour)
+                increment_heatmap(label, tweet_time_object)
                 increment_counter(label + "_tweets")
                 add_data("metadata", label + "_tweeters", info["name"])
                 increment_per_hour(label + "_tweeters", info["datestring"], info["name"])
