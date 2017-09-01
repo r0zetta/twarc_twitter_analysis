@@ -25,6 +25,7 @@ restart = False
 threaded = True
 debug = False
 test = False
+collect_only = False
 exit_correctly = False
 searches = []
 tweet_queue = None
@@ -63,6 +64,7 @@ def init_config():
     conf["config"]["dump_interarrivals"] = True
     conf["config"]["dump_timeline_data"] = False
     conf["config"]["dump_raw_data"] = False
+    conf["config"]["dump_graphs"] = True
     conf["config"]["sanitize_text"] = False
     return
 
@@ -1064,10 +1066,12 @@ def read_config_preserve_case(filename):
 
 def cleanup():
     debug_print(sys._getframe().f_code.co_name)
+    global dump_file_handle
     if threaded == True:
         if get_active_threads > 1:
             print "Waiting for queue to empty..."
             tweet_queue.join()
+    dump_file_handle.close()
     print "Serializing data..."
     serialize_data()
 
@@ -1086,7 +1090,7 @@ def log_stacktrace():
 
 def init_tweet_processor():
     debug_print(sys._getframe().f_code.co_name)
-    directories = ["serialized", "data", "cache", "data/heatmaps", "data/custom", "data/raw"]
+    directories = ["serialized", "data", "data/heatmaps", "data/custom", "data/raw"]
     for dir in directories:
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -1186,13 +1190,11 @@ def deserialize_data():
 
 def dump_tweet_to_disk(item):
     debug_print(sys._getframe().f_code.co_name)
+    global dump_file_handle
     if "dump_raw_data" in conf["config"]:
         if conf["config"]["dump_raw_data"] == True:
-            if "id_str" in item:
-                filename = "data/raw/" + item["id_str"] + ".json"
-                handle = open(filename, 'w')
-                json.dump(item, handle, indent=4)
-                handle.close()
+            json.dump(item, dump_file_handle)
+            dump_file_handle.write(u"\n")
     return
 
 def add_timeline_data(date, name, action, item, twt_id):
@@ -1845,13 +1847,16 @@ def dump_data():
 
 def dump_graphs():
     debug_print(sys._getframe().f_code.co_name)
-    debug_print("Dumping trends and graphs.")
-    data_types = ["per_hour_data", "per_day_data"]
-    for d in data_types:
-        dump_periodic_data_trends(d)
-        dump_periodic_data_graphs(d)
-        dump_overall_data_graphs(d)
-        dump_overall_object_graphs(d)
+    if "config" in conf:
+        if "dump_graphs" in conf["config"]:
+            if conf["config"]["dump_graphs"] == True:
+                debug_print("Dumping trends and graphs.")
+                data_types = ["per_hour_data", "per_day_data"]
+                for d in data_types:
+                    dump_periodic_data_trends(d)
+                    dump_periodic_data_graphs(d)
+                    dump_overall_data_graphs(d)
+                    dump_overall_object_graphs(d)
 
 
 ###############################
@@ -1862,7 +1867,6 @@ def process_tweet(status):
     info = {}
     info["processing_start_time"] = int(time.time())
     increment_counter("tweets_processed")
-    increment_counter("tweets_processed_this_interval")
 
     if "created_at" not in status:
         return
@@ -2386,7 +2390,8 @@ def dump_event():
     if int(time.time()) > get_counter("previous_dump_time") + get_counter("dump_interval"):
         start_time = int(time.time())
         gathering_time = start_time - get_counter("previous_dump_time") - get_counter("dump_interval")
-        dump_data()
+        if collect_only == False:
+            dump_data()
         end_time = int(time.time())
         dump_time = end_time - start_time
         graph_dump_time = 0
@@ -2473,9 +2478,10 @@ def tweet_processing_thread():
     while True:
         item = tweet_queue.get()
         dump_tweet_to_disk(item)
-        process_tweet(item)
-        tweet_queue.task_done()
+        if collect_only == False:
+            process_tweet(item)
         periodic_events()
+        tweet_queue.task_done()
     return
 
 ##########################################
@@ -2499,6 +2505,7 @@ def process_status(status):
     captured_status = capture_status_items(status)
     if captured_status is not None:
         increment_counter("tweets_captured")
+        increment_counter("tweets_processed_this_interval")
         if threaded == True:
             tweet_queue.put(captured_status)
             if get_active_threads() < 2:
@@ -2510,7 +2517,8 @@ def process_status(status):
                     sys.exit(0)
         else:
             dump_tweet_to_disk(captured_status)
-            process_tweet(captured_status)
+            if collect_only == False:
+                process_tweet(item)
             periodic_events()
     sys.stdout.write("#")
     sys.stdout.flush()
@@ -2521,7 +2529,7 @@ def process_status(status):
 ##############
 def process_args(args):
     debug_print(sys._getframe().f_code.co_name)
-    global restart, threaded, debug, test
+    global restart, threaded, debug, test, collect_only
     for arg in sys.argv:
         print "Got arg: " + arg
         if "restart" in arg:
@@ -2534,6 +2542,8 @@ def process_args(args):
             debug = True
         if "test" in arg:
             test = True
+        if "collect" in arg:
+            collect_only = True
 
 def get_active_threads():
     debug_print(sys._getframe().f_code.co_name)
@@ -2576,6 +2586,7 @@ if __name__ == '__main__':
         restart = False
 
     init_tweet_processor()
+    dump_file_handle = open("data/raw/raw.json", "a")
 
 # Start a thread to process incoming tweets
     if threaded == True:
