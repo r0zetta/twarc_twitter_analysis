@@ -570,6 +570,12 @@ def set_previous_seen(category, item):
     debug_print(sys._getframe().f_code.co_name)
     timestamp = int(time.time())
     set_storage_large("previous_seen", category, item, timestamp)
+    if not exists_storage_large("first_seen", category, item):
+        set_storage_large("first_seen", category, item, timestamp)
+
+def get_first_seen(category, item):
+    debug_print(sys._getframe().f_code.co_name)
+    get_storage_large("first_seen", category, item)
 
 def get_previous_seen(category, item):
     debug_print(sys._getframe().f_code.co_name)
@@ -860,7 +866,6 @@ def twarc_time_to_readable(time_string):
         new_string = first_bit + " " + last_bit
         date_object = datetime.strptime(new_string, twarc_format)
         return date_object.strftime("%Y-%m-%d %H:%M:%S")
-
 
 def time_object_to_readable(time_object):
     return time_object.strftime("%Y-%m-%d %H:%M:%S")
@@ -1254,6 +1259,21 @@ def dump_languages_graph():
                 chart_data[item] = value
         dirname = "data/"
         filename = "_lang_breakdown.svg"
+        title = "Language breakdown"
+        dump_pie_chart(dirname, filename, title, chart_data)
+
+def dump_captured_languages_graph():
+    debug_print(sys._getframe().f_code.co_name)
+    counter_data = get_all_counters()
+    if counter_data is not None:
+        chart_data = {}
+        for name, value in sorted(counter_data.iteritems(), key=lambda x:x[0], reverse= False):
+            m = re.search("^captured_tweets_([a-z][a-z][a-z]?)$", name)
+            if m is not None:
+                item = m.group(1)
+                chart_data[item] = value
+        dirname = "data/"
+        filename = "_captured_lang_breakdown.svg"
         title = "Language breakdown"
         dump_pie_chart(dirname, filename, title, chart_data)
 
@@ -1775,8 +1795,11 @@ def dump_userinfo():
                 handle.write(u", ")
                 if key in data:
                     data_type = type(data[key])
-                    if data_type is int or data_type is float:
+                    if data_type is int:
                         handle.write(unicode(data[key]))
+                    elif data_type is float:
+                        num_string = "%.2f" % data[key]
+                        handle.write(unicode(num_string))
                     else:
                         handle.write(unicode(data[key]))
             handle.write(u"\n")
@@ -1842,6 +1865,7 @@ def dump_data():
     debug_print("Dumping counters.")
     dump_counters()
     dump_languages_graph()
+    dump_captured_languages_graph()
     dump_targets_graph()
     dump_keywords_graph()
 
@@ -1856,10 +1880,10 @@ def dump_graphs():
                 debug_print("Dumping trends and graphs.")
                 data_types = ["per_hour_data", "per_day_data"]
                 for d in data_types:
-                    dump_periodic_data_trends(d)
-                    dump_periodic_data_graphs(d)
                     dump_overall_data_graphs(d)
-                    dump_overall_object_graphs(d)
+                    #dump_periodic_data_trends(d)
+                    #dump_periodic_data_graphs(d)
+                    #dump_overall_object_graphs(d)
 
 
 ###############################
@@ -2503,6 +2527,7 @@ def process_status(status):
                 return
     captured_status = capture_status_items(status)
     if captured_status is not None:
+        increment_counter("captured_tweets_" + lang)
         increment_counter("tweets_captured")
         increment_counter("tweets_processed_this_interval")
         if threaded == True:
