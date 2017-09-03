@@ -67,11 +67,11 @@ if __name__ == '__main__':
     name = item.name
     screen_name = item.screen_name
     user_id = item.id_str
-    tweets = str(item.statuses_count)
-    likes = str(item.favourites_count)
-    lists = str(item.listed_count)
-    following = str(item.friends_count)
-    followers = str(item.followers_count)
+    tweets = item.statuses_count
+    likes = item.favourites_count
+    lists = item.listed_count
+    following = item.friends_count
+    followers = item.followers_count
     account_created_date = item.created_at
     account_created_date_readable = time_object_to_string(account_created_date)
 
@@ -84,7 +84,6 @@ if __name__ == '__main__':
         tweets_per_hour = float(tweets)/float(account_age_days * 24)
 
     previous_tweet_time = None
-    tweets = 0
     retweets = 0
     replies = 0
     for status in Cursor(auth_api.user_timeline, id=target).items():
