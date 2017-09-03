@@ -1240,10 +1240,14 @@ def dump_pie_chart(dirname, filename, title, data):
         total += c
     pie_chart = pygal.Pie(truncate_legend=-1)
     pie_chart.title = title
-    for n, c in sorted(data.iteritems()):
+    output_count = 0
+    for n, c in sorted(data.iteritems(), key=lambda x:x[1], reverse = True):
         percent = float(float(c)/float(total))*100.00
         label = n + " (" + "%.2f" % percent + "%)"
         pie_chart.add(label, c)
+        output_count += 1
+        if output_count > 15:
+            break
     pie_chart.render_to_file(filepath)
 
 
@@ -1252,7 +1256,7 @@ def dump_languages_graph():
     counter_data = get_all_counters()
     if counter_data is not None:
         chart_data = {}
-        for name, value in sorted(counter_data.iteritems(), key=lambda x:x[0], reverse= False):
+        for name, value in sorted(counter_data.iteritems(), key=lambda x:x[1], reverse= True):
             m = re.search("^tweets_([a-z][a-z][a-z]?)$", name)
             if m is not None:
                 item = m.group(1)
@@ -1267,7 +1271,7 @@ def dump_captured_languages_graph():
     counter_data = get_all_counters()
     if counter_data is not None:
         chart_data = {}
-        for name, value in sorted(counter_data.iteritems(), key=lambda x:x[0], reverse= False):
+        for name, value in sorted(counter_data.iteritems(), key=lambda x:x[1], reverse= True):
             m = re.search("^captured_tweets_([a-z][a-z][a-z]?)$", name)
             if m is not None:
                 item = m.group(1)
@@ -1282,7 +1286,7 @@ def dump_targets_graph():
     counter_data = get_all_counters()
     if counter_data is not None:
         chart_data = {}
-        for name, value in sorted(counter_data.iteritems(), key=lambda x:x[0], reverse= False):
+        for name, value in sorted(counter_data.iteritems(), key=lambda x:x[1], reverse= True):
             m = re.search("^target_(.+)$", name)
             if m is not None:
                 item = m.group(1)
@@ -1297,7 +1301,7 @@ def dump_keywords_graph():
     counter_data = get_all_counters()
     if counter_data is not None:
         chart_data = {}
-        for name, value in sorted(counter_data.iteritems(), key=lambda x:x[0], reverse= False):
+        for name, value in sorted(counter_data.iteritems(), key=lambda x:x[1], reverse= True):
             m = re.search("^keyword_(.+)$", name)
             if m is not None:
                 item = m.group(1)
@@ -1595,7 +1599,7 @@ def dump_counters():
     handle = io.open("data/_counters.txt", "w", encoding='utf-8')
     counter_dump = get_all_counters()
     if counter_dump is not None:
-        for n, c in sorted(counter_dump.iteritems(), key=lambda x:x[0], reverse=False):
+        for n, c in sorted(counter_dump.iteritems(), key=lambda x:x[1], reverse=True):
             handle.write(unicode(n) + u" = " + unicode(c) + u"\n")
     handle.close
 
