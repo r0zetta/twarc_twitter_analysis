@@ -966,13 +966,13 @@ def tokenize(text):
                 continue
             elif u"&amp;" in t or u"…" in t or u"htt" in t: 
                 continue
-            elif re.search(u"^[0-9\.\,%]+$", t):
+            elif re.search(u"^[0-9\.\,%]+$", t) is not None:
                 continue
-            elif re.search(u"\s+", t):
+            elif re.search(u"\s+", t) is not None:
                 continue
-            elif re.search(u"[\.\,\:\;\?\-\_\!]+", t):
+            elif re.search(u"[\.\,\:\;\?\-\_\!]+", t) is not None:
                 continue
-            elif re.search(u"^rt$", t):
+            elif re.search(u"^rt$", t) is not None:
                 continue
             elif re.search(url_match, t) is not None:
                 continue
@@ -1322,13 +1322,24 @@ def dump_keywords_graph():
         title = "Keywords breakdown"
         dump_pie_chart(dirname, filename, title, chart_data)
 
+def is_graph_printable(name):
+    debug_print(sys._getframe().f_code.co_name)
+    ret = True
+    if re.search("^keyword_.+$", name) is not None:
+        ret = False
+    if re.search("^url_keyword_.+$", name) is not None:
+        ret = False
+    if "tweets" in name:
+        ret = False
+    return ret
+
 def dump_overall_object_graphs(data_type):
     debug_print(sys._getframe().f_code.co_name)
     data_sets = ["users", "metadata"]
     current_datestring = get_datestring(data_type, 0)
     for ds in data_sets:
         for category in get_categories_from_storage(ds):
-            if "keyword" in category or "url" in category or "tweets" in category:
+            if is_graph_printable(category) == False:
                 continue
             top_data = get_top_data_entries(ds, category, 10)
             top_data_names = []
@@ -1367,7 +1378,7 @@ def dump_overall_data_graphs(data_type):
     current_datestring = get_datestring(data_type, 0)
     for ds in data_sets:
         for category in get_categories_from_storage(ds):
-            if "url" in category or "tweets" in category or "keyword" in category or "tweeters" in category:
+            if is_graph_printable(category) == False:
                 continue
             top_data = get_top_data_entries(ds, category, 10)
             top_data_names = []
@@ -1410,7 +1421,7 @@ def dump_periodic_data_graphs(data_type):
     top_level_cats = get_category_names_from_periodic_data(data_type)
     current_datestring = get_datestring(data_type, 0)
     for cat in top_level_cats:
-        if "url" in cat or "tweets" in cat or "keyword" in cat or "tweeters" in cat:
+        if is_graph_printable(cat) == False:
             continue
         current_label = cat + "_" + current_datestring
         if current_label in categories:
@@ -1453,7 +1464,7 @@ def dump_periodic_data_trends(data_type):
     top_level_cats = get_category_names_from_periodic_data(data_type)
     current_datestring = get_datestring(data_type, 0)
     for cat in top_level_cats:
-        if "keyword" in cat or "url" in cat or "tweets" in cat or "keyword" in cat or "tweeters" in cat:
+        if is_graph_printable(cat) == False:
             continue
         trend_data = calculate_trends(data_type, cat, 10)
         num_values = 0
@@ -1683,58 +1694,56 @@ def dump_heatmap_comparison():
             chart.add(name, mark_list)
     chart.render_to_file(filename + ".svg")
 
-def dump_dicts(var_name, variable, threshold, dir_name):
+def determine_dump_filename(data_type, category, label):
     debug_print(sys._getframe().f_code.co_name)
-    if len(variable) < 1:
+    dirname = "data/"
+    if data_type != "":
+        dirname += data_type + "/"
+    if category != "":
+        if category.startswith("url_keyword_"):
+            dirname += "url_keyword/"
+        if category.startswith("keyword_"):
+            dirname += "keyword/"
+        if category != "monitored_hashtags":
+            if category.startswith("monitored_"):
+                dirname += "monitored_hashtag/"
+        dirname += category + "/"
+    if category == "":
+        if label.startswith("url_keyword_"):
+            dirname += "url_keyword/"
+        if label.startswith("keyword_"):
+            dirname += "keyword/"
+        if label.startswith("monitored_"):
+            dirname += "monitored/"
+    filename = dirname + label + ".txt"
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    return filename
+
+def dump_dicts(raw_data, data_type, category, label):
+    debug_print(sys._getframe().f_code.co_name)
+    if len(raw_data) < 1:
         return
-    target_dir = "data"
-    if var_name.startswith("url_keyword") or dir_name.startswith("url_keyword"):
-        target_dir += "/url_keyword"
-    elif var_name.startswith("monitored") or dir_name.startswith("monitored"):
-        target_dir += "/monitored_hashtags"
-    elif var_name.startswith("keyword") or dir_name.startswith("keyword"):
-        target_dir += "/keyword"
+    filename = determine_dump_filename(data_type, category, label)
+    debug_print("dump_dicts: filename: " + filename)
 
-# XXX This is definitely broken
-    if len(dir_name) < 1:
-        if var_name.startswith("top_user"):
-            target_dir += "/top_users"
-        elif var_name.startswith("top_metadata"):
-            target_dir += "/top_metadata"
-        elif var_name.startswith("words"):
-            target_dir += "/all_words"
-        else:
-            target_dir += "/overall"
-
-    if len(dir_name) > 0:
-        target_dir += "/" + dir_name
-
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir)
-
-    filename = target_dir + "/" + var_name + ".txt"
-    if debug == True:
-        print "dump_dicts: filename: " + filename
-
-    if type(variable) is not dict:
+    if type(raw_data) is not dict:
         print var_name
-        print variable
+        print raw_data
         sys.exit(0)
 
     handle = io.open(filename, 'w', encoding='utf-8')
     c = 0
     w = 0
     max_entries = 200
-    for tag, count in sorted(variable.items(), key=lambda x:x[1], reverse=True):
+    for tag, count in sorted(raw_data.items(), key=lambda x:x[1], reverse=True):
         if c > max_entries:
             break
         if count > w:
             w = count
-        if count >= threshold:
-            handle.write(unicode(tag) + u"," + unicode(count) + u"\n")
-            c += 1
+        handle.write(unicode(tag) + u"," + unicode(count) + u"\n")
+        c += 1
     handle.close()
-    debug_print("Found " + str(len(variable)) + " " + var_name + " (wrote " + str(c) + ", winner had " + str(w) + ").")
 
 def dump_associations():
     debug_print(sys._getframe().f_code.co_name)
@@ -1844,20 +1853,18 @@ def dump_data():
                     if m is not None:
                         category = m.group(1)
                         dirname = d + "/" + category
-                        dump_dicts(label, raw_data, 1, dirname)
+                        dump_dicts(raw_data, d, category, label)
 
     debug_print("Dumping users")
-    dump_type = "top_"
-    if threaded == True:
-        dump_type = ""
+    dump_type = ""
     for category in get_categories_from_storage(dump_type + "users"):
         raw_data = get_category_data(dump_type + "users", category)
-        dump_dicts(category, raw_data, 1, "")
+        dump_dicts(raw_data, "overall", "", category)
 
     debug_print("Dumping metadata")
     for category in get_categories_from_storage(dump_type + "metadata"):
         raw_data = get_category_data(dump_type + "metadata", category)
-        dump_dicts(category, raw_data, 1, "")
+        dump_dicts(raw_data, "overall", "", category)
 
     debug_print("Dumping heatmaps")
     heatmaps = get_all_heatmaps()
@@ -2068,7 +2075,7 @@ def process_tweet(status):
                     add_timeline_data(info["tweet_time_readable"], info["name"], "used hashtag", t, info["tweet_id"])
                     increment_per_hour("all_hashtags", info["datestring"], t)
                     for h in conf["settings"]["monitored_hashtags"]:
-                        if h in t:
+                        if h == t:
                             label = "monitored_" + h + "_hashtag"
                             increment_heatmap(label, tweet_time_object)
                             increment_per_hour("monitored_hashtags", info["datestring"], h)
