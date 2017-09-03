@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from tweepy.streaming import StreamListener
 from tweepy import OAuthHandler
 from tweepy import Stream
@@ -8,6 +9,7 @@ from authentication_keys import get_account_credentials
 import numpy as np
 import os.path
 import random
+import json
 import time
 import sys
 import re
@@ -18,6 +20,64 @@ count = 1
 data = {}
 target = "@r0zetta"
 output_dir = "captures/"
+
+def strip_crap(text):
+    if len(text) < 1:
+        return
+    t = text
+    fl = text[0]
+    if '#' in fl or '@' in fl or '.' in fl or ':' in fl or ',' in fl or '\"' in fl or '&' in fl or '\'' in fl or '\`' in fl or '(' in fl or ')' in fl or ')' in fl:
+        t = t[1:]
+    fl = text[-1]
+    if '#' in fl or '@' in fl or '.' in fl or ':' in fl or ',' in fl or '\"' in fl or '&' in fl or '\'' in fl or '\`' in fl or '(' in fl or ')' in fl or ')' in fl:
+        t = t[:-1]
+    return t
+
+def tokenize(text):
+    url_match = "^(https?:\/\/)[0-9a-zA-Z]+\.[-_0-9a-zA-Z]+\.?[0-9a-zA-Z]*\/?.*$"
+    tokens = text.split()
+    ret = []
+    for t in tokens:
+        if t is not None and len(t) > 3:
+            t = t.lower()
+            changed = True
+            while changed is True:
+                new = strip_crap(t)
+                if new != t:
+                    changed = True
+                else:
+                    changed = False
+                t = new
+                if len(t) < 1:
+                    break
+            if len(t) < 3:
+                continue
+            elif u"&amp;" in t or u"…" in t or u"htt" in t: 
+                continue
+            elif re.search(u"^[0-9\.\,%]+$", t):
+                continue
+            elif re.search(u"\s+", t):
+                continue
+            elif re.search(u"[\.\,\:\;\?\-\_\!]+", t):
+                continue
+            elif re.search(u"^rt$", t):
+                continue
+            elif re.search(url_match, t) is not None:
+                continue
+            else:
+                if len(t) > 0:
+                    ret.append(t)
+    return ret
+
+def strip_stopwords(raw_data, lang):
+    global stopwords
+    ret = []
+    if lang not in stopwords:
+        return raw_data
+    for word in raw_data:
+        if word not in stopwords[lang]:
+            ret.append(word)
+    return ret
 
 def time_string_to_object(time_string):
     return datetime.strptime(time_string, '%Y-%m-%d %H:%M:%S')
@@ -41,6 +101,19 @@ def output_data():
             output_string += unicode(count) + u": " + unicode(item) + u"\n"
     return output_string
 
+def output_top_data():
+    output_string = ""
+    for label, stuff in sorted(data.iteritems()):
+        output_string += u"\n" + label.encode('utf-8') + u":\n\n"
+        output_count = 0
+        for item, count in sorted(stuff.iteritems(), key=lambda x:x[1], reverse=True):
+            if count > 1:
+                output_string += unicode(count) + u": " + unicode(item) + u"\n"
+            output_count += 1
+            if output_count > 10:
+                break
+    return output_string
+
 if __name__ == '__main__':
     acct_name, consumer_key, consumer_secret, access_token, access_token_secret = get_account_credentials()
     auth = OAuthHandler(consumer_key, consumer_secret)
@@ -52,6 +125,11 @@ if __name__ == '__main__':
 
     print "Signing in as: " + auth_api.me().name
     print "Target: " + target.encode('utf-8')
+
+    if os.path.exists("corpus/stopwords-iso.json"):
+        handle = open("corpus/stopwords-iso.json", "r")
+        stopwords = json.load(handle)
+        handle.close()
 
     tweet_count = 0
 
@@ -117,7 +195,9 @@ if __name__ == '__main__':
                 increment_counter("replied_to", status.in_reply_to_screen_name)
                 replies += 1
 
+        lang = ""
         if hasattr(status, 'lang'):
+            lang = status.lang
             increment_counter("languages", status.lang)
 
         retweeted = False
@@ -176,6 +256,10 @@ if __name__ == '__main__':
 # get user agents
         increment_counter("sources", status.source)
 
+        tokens = strip_stopwords(tokenize(text), lang)
+        for t in tokens:
+            increment_counter("words", t)
+
         sys.stdout.write("#")
         sys.stdout.flush()
 
@@ -216,7 +300,7 @@ if __name__ == '__main__':
     handle.write("Sun, " + ','.join(map(str, heatmap[6])) + "\n")
     handle.close()
 
-    filename = output_dir + target.encode('utf-8') + "-details.txt"
+    filename = output_dir + target.encode('utf-8') + "-digest.txt"
     print "Writing file: " + filename
     handle = io.open(filename, 'w', encoding='utf-8')
 #    handle.write(u"User name: " + name.encode('utf-8') + u"\n")
@@ -233,6 +317,13 @@ if __name__ == '__main__':
     handle.write(u"Tweets analyzed: " + unicode(tweet_count) + u"\n")
     handle.write(u"Retweets: " + unicode(retweets) + u"\n")
     handle.write(u"Replies: " + unicode(replies) + u"\n")
+    data_string = output_top_data()
+    handle.write(data_string)
+    handle.close()
+
+    filename = output_dir + target.encode('utf-8') + "-full.txt"
+    print "Writing file: " + filename
+    handle = io.open(filename, 'w', encoding='utf-8')
     data_string = output_data()
     handle.write(data_string)
     handle.close()
