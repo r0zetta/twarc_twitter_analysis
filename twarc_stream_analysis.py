@@ -1610,7 +1610,7 @@ def dump_counters():
     handle = io.open("data/_counters.txt", "w", encoding='utf-8')
     counter_dump = get_all_counters()
     if counter_dump is not None:
-        for n, c in sorted(counter_dump.iteritems(), key=lambda x:x[1], reverse=True):
+        for n, c in sorted(counter_dump.iteritems()):
             handle.write(unicode(n) + u" = " + unicode(c) + u"\n")
     handle.close
 
@@ -2113,6 +2113,8 @@ def process_tweet(status):
                         if k in u:
                             label = "url_keyword_" + k
                             add_data("metadata", label, u)
+                            increment_per_hour("url_keywords", info["datestring"], k)
+                            add_data("metadata", "url_keywords", k)
                             increment_per_hour(label, info["datestring"], u)
                             increment_per_hour(label + "_tweeter", info["datestring"], info["name"])
                             increment_per_hour(label + "_tweets", info["datestring"], info["text"])
@@ -2155,6 +2157,8 @@ def process_tweet(status):
                 increment_heatmap(label, tweet_time_object)
                 increment_counter(label + "_tweets")
                 add_data("metadata", label + "_tweeters", info["name"])
+                increment_per_hour("keywords", info["datestring"], k)
+                add_data("metadata", "keywords", k)
                 increment_per_hour(label + "_tweeters", info["datestring"], info["name"])
                 increment_per_hour(label + "_tweets", info["datestring"], info["text"])
                 add_timeline_data(info["tweet_time_readable"], info["name"], "used monitored keyword:", k, info["tweet_id"])
