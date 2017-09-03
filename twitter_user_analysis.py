@@ -164,6 +164,8 @@ if __name__ == '__main__':
     previous_tweet_time = None
     retweets = 0
     replies = 0
+    quote_tweets = 0
+    own_tweets = 0
     for status in Cursor(auth_api.user_timeline, id=target).items():
         tweet_count = tweet_count + 1
 
@@ -209,8 +211,7 @@ if __name__ == '__main__':
                         if orig_tweet.user.screen_name is not None:
                             retweeted_user = orig_tweet.user.screen_name
                             increment_counter("retweeted", retweeted_user)
-                            increment_counter("retweets", "count")
-                            retweets += 1
+                            retweeted = True
 
         if hasattr(status, 'quoted_status'):
             orig_tweet = status.quoted_status
@@ -220,8 +221,12 @@ if __name__ == '__main__':
                         if orig_tweet['user']['screen_name'] is not None:
                             quoted_user = orig_tweet['user']['screen_name']
                             increment_counter("quoted", quoted_user)
-                            increment_counter("quote_tweets", "count")
-                            retweeted = True
+                            quote_tweets += 1
+
+        if retweeted is True:
+            retweets += 1
+        else:
+            own_tweets += 1
 
         if hasattr(status, 'entities'):
             entities = status.entities
@@ -267,6 +272,7 @@ if __name__ == '__main__':
     print "All done. Processed " + str(tweet_count) + " tweets."
     print
 
+    output_dir += target.encode('utf-8') + "/"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -316,6 +322,8 @@ if __name__ == '__main__':
     handle.write(u"Tweets per day: " + unicode(tweets_per_day) + u"\n")
     handle.write(u"Tweets analyzed: " + unicode(tweet_count) + u"\n")
     handle.write(u"Retweets: " + unicode(retweets) + u"\n")
+    handle.write(u"Quote tweets: " + unicode(quote_tweets) + u"\n")
+    handle.write(u"Own tweets: " + unicode(own_tweets) + u"\n")
     handle.write(u"Replies: " + unicode(replies) + u"\n")
     data_string = output_top_data()
     handle.write(data_string)
