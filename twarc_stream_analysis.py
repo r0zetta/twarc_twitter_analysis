@@ -2071,6 +2071,8 @@ def process_tweet(status):
                         if h in t:
                             label = "monitored_" + h + "_hashtag"
                             increment_heatmap(label, tweet_time_object)
+                            increment_per_hour("monitored_hashtags", info["datestring"], h)
+                            add_data("metadata", "monitored_hashtags", t)
                             add_data("users", label + "_tweeters", info["name"])
                             increment_per_hour(label + "_tweeters", info["datestring"], info["name"])
                             increment_per_hour(label + "_tweets", info["datestring"], info["text"])
