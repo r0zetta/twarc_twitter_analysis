@@ -855,7 +855,6 @@ def debug_print(string):
         print string
 
 def twarc_time_to_readable(time_string):
-# e.g. Thu Aug 31 12:45:31 +0000 2017
     twarc_format = "%a %b %d %H:%M:%S %Y"
     match_expression = "^(.+)\s(\+[0-9][0-9][0-9][0-9])\s([0-9][0-9][0-9][0-9])$"
     match = re.search(match_expression, time_string)
@@ -866,6 +865,18 @@ def twarc_time_to_readable(time_string):
         new_string = first_bit + " " + last_bit
         date_object = datetime.strptime(new_string, twarc_format)
         return date_object.strftime("%Y-%m-%d %H:%M:%S")
+
+def twarc_time_to_object(time_string):
+    twarc_format = "%a %b %d %H:%M:%S %Y"
+    match_expression = "^(.+)\s(\+[0-9][0-9][0-9][0-9])\s([0-9][0-9][0-9][0-9])$"
+    match = re.search(match_expression, time_string)
+    if match is not None:
+        first_bit = match.group(1)
+        second_bit = match.group(2)
+        last_bit = match.group(3)
+        new_string = first_bit + " " + last_bit
+        date_object = datetime.strptime(new_string, twarc_format)
+        return date_object
 
 def time_object_to_readable(time_object):
     return time_object.strftime("%Y-%m-%d %H:%M:%S")
@@ -2520,9 +2531,15 @@ def process_status(status):
     captured_status = {}
     increment_counter("tweets_encountered")
     lang = ""
+    datestring = None
+    if "created_at" in status:
+        datestring = twarc_time_to_object(status["created_at"]).strftime("%Y%m%d%H")
     if "lang" in status:
         lang = status["lang"]
+        if datestring is not None:
+            increment_per_hour("lang", datestring, lang)
         increment_counter("tweets_" + lang)
+        add_data("metadata", "lang", lang)
         if len(conf["settings"]["monitored_langs"]) > 0:
             if lang not in conf["settings"]["monitored_langs"]:
                 debug_print("Skipping tweet of lang: " + lang)
@@ -2534,6 +2551,9 @@ def process_status(status):
         increment_counter("captured_tweets_" + lang)
         increment_counter("tweets_captured")
         increment_counter("tweets_processed_this_interval")
+        if datestring is not None:
+            increment_per_hour("captured_lang", datestring, lang)
+        add_data("metadata", "captured_lang", lang)
         if threaded == True:
             tweet_queue.put(captured_status)
             if get_active_threads() < 2:
@@ -2546,7 +2566,7 @@ def process_status(status):
         else:
             dump_tweet_to_disk(captured_status)
             if collect_only == False:
-                process_tweet(item)
+                process_tweet(captured_status)
             periodic_events()
     sys.stdout.write("#")
     sys.stdout.flush()
