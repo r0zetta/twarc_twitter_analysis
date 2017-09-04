@@ -2504,10 +2504,13 @@ def dump_event():
     if int(time.time()) > get_counter("previous_dump_time") + get_counter("dump_interval"):
         start_time = int(time.time())
         gathering_time = start_time - get_counter("previous_dump_time") - get_counter("dump_interval")
+        print
+        print "Gathering took: " + str(gathering_time) + " seconds."
         if collect_only == False:
             dump_data()
         end_time = int(time.time())
         dump_time = end_time - start_time
+        print "Data dump took: " + str(dump_time) + " seconds."
         graph_dump_time = 0
         if threaded == True:
             if int(time.time()) > int(get_counter("previous_graph_dump_time") + conf["params"]["graph_dump_interval"]):
@@ -2516,6 +2519,7 @@ def dump_event():
                 set_counter("previous_graph_dump_time", int(time.time()))
                 end_time = int(time.time())
                 graph_dump_time = end_time - start_time
+                print "Graph dump took: " + str(graph_dump_time) + " seconds."
         serialize_time = 0
         if threaded == True:
             if int(time.time()) > int(get_counter("previous_serialize") + conf["params"]["serialization_interval"]):
@@ -2524,22 +2528,17 @@ def dump_event():
                 set_counter("previous_serialize", int(time.time()))
                 end_time = int(time.time())
                 serialize_time = end_time - start_time
-        processing_time = dump_time + graph_dump_time + serialize_time + gathering_time
-        print
+                print "Serialization took: " + str(serialize_time) + " seconds."
+        current_time = int(time.time())
+        processing_time = current_time - get_counter("previous_dump_time")
         if threaded == True:
             queue_length = tweet_queue.qsize()
             print str(queue_length) + " items in the queue."
             active_threads = get_active_threads()
             print str(active_threads) + " threads active."
-        print "Gathering took: " + str(gathering_time) + " seconds."
-        print "Dump took: " + str(dump_time) + " seconds."
-        if graph_dump_time > 0:
-            print "Graph dump took: " + str(graph_dump_time) + " seconds."
-        if serialize_time > 0:
-            print "Serialization took: " + str(serialize_time) + " seconds."
-        print "Processed " + str(get_counter("tweets_processed_this_interval")) + " tweets this " + str(get_counter("dump_interval")) + " second interval."
+        print "Processed " + str(get_counter("tweets_processed_this_interval")) + " tweets during the last " + str(processing_time) + " seconds."
         print "Tweets encountered: " + str(get_counter("tweets_encountered")) + ", captured: " + str(get_counter("tweets_captured")) + ", processed: " + str(get_counter("tweets_processed"))
-        tps = float(float(get_counter("tweets_processed_this_interval"))/float(get_counter("dump_interval")))
+        tps = float(float(get_counter("tweets_processed_this_interval"))/float(processing_time))
         print "Tweets per second: " + str("%.2f" % tps)
         set_counter("tweets_processed_this_interval", 0)
         set_counter("previous_dump_time", int(time.time()))
