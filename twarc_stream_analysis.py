@@ -1642,19 +1642,33 @@ def dump_heatmap(name):
         handle.close()
     return
 
+def include_in_heatmap_comparison_graph(title):
+    debug_print(sys._getframe().f_code.co_name)
+    ret = True
+    if re.search("^target_.+$", title) is not None:
+        ret = False
+    if re.search("^tweets_([a-z][a-z])$", title) is not None:
+        ret = False
+    if "keyword" in title:
+        ret = False
+    if "monitored" in title:
+        ret = False
+    if "tweets_und" in title:
+        ret = False
+    return ret
+
 def dump_heatmap_comparison():
     debug_print(sys._getframe().f_code.co_name)
     filename = "data/custom/global_heatmaps"
+    graph_titles = []
     titles = []
     weeks = []
     output_string = u"Date"
     heatmaps = get_all_heatmaps()
     for title, stuff in sorted(heatmaps.iteritems()):
-        if "keyword" not in title and "monitored" not in title:
-            m = re.search("^tweets_([a-z][a-z])$", title)
-            if m is None:
-                if "tweets_und" not in title:
-                    titles.append(title)
+        if include_in_heatmap_comparison_graph(title):
+            graph_titles.append(title)
+        titles.append(title)
         output_string += u", " + unicode(title)
     output_string += u"\n"
     for yearweek, weekdata in sorted(heatmaps[titles[0]].iteritems()):
@@ -1674,8 +1688,9 @@ def dump_heatmap_comparison():
                         if week in heatmaps[title]:
                             val = heatmaps[title][week][day][hour]
                             date_string = week + " " + day_name + " " + str(hour) + ":00"
-                            graph_item["date"] = date_string
-                            graph_item[title] = val
+                            if title in graph_titles:
+                                graph_item["date"] = date_string
+                                graph_item[title] = val
                             this_row.append(val)
                             row_sum += val
                 if row_sum > 0:
@@ -1688,10 +1703,9 @@ def dump_heatmap_comparison():
     handle.close()
     chart = pygal.Bar(show_y_guides=False)
     chart.x_labels = [x['date'] for x in graph_data]
-    for name in titles:
-        if name in graph_data:
-            mark_list = [x[name] for x in graph_data]
-            chart.add(name, mark_list)
+    for name in graph_titles:
+        mark_list = [x[name] for x in graph_data]
+        chart.add(name, mark_list)
     chart.render_to_file(filename + ".svg")
 
 def determine_dump_filename(data_type, category, label):
