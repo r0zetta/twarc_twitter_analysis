@@ -376,6 +376,36 @@ def get_from_list_data(variable, category, name):
 # Custom storage and wrappers
 #############################
 
+def record_tweet_volume(label, timestamp, value):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    entry = {}
+    if "tweet_volumes" not in data:
+        data["tweet_volumes"] = {}
+    if label not in data["tweet_volumes"]:
+        data["tweet_volumes"][label] = []
+    entry[timestamp] = value
+    data["tweet_volumes"][label].append(entry)
+
+def get_tweet_volumes(label):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    ret = {}
+    if "tweet_volumes" in data:
+        if label in data["tweet_volumes"]:
+            ret = data["tweet_volumes"][label]
+    return ret
+
+def get_tweet_volume_labels():
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    ret = []
+    if "tweet_volumes" in data:
+        for label, stuff in data["tweet_volumes"].iteritems():
+            if label not in ret:
+                ret.append(label)
+    return ret
+
 def add_userinfo(category, name, user_data):
     debug_print(sys._getframe().f_code.co_name)
     return set_storage("userinfo", category, name, user_data)
@@ -1261,6 +1291,24 @@ def dump_pie_chart(dirname, filename, title, data):
             break
     pie_chart.render_to_file(filepath)
 
+def dump_tweet_volume_graphs():
+    debug_print(sys._getframe().f_code.co_name)
+    labels = get_tweet_volume_labels()
+    for l in labels:
+        volume_data = get_tweet_volumes(l)
+        dates = []
+        volumes = []
+        for items in volume_data:
+            date = items.keys()
+            volume = items.values()
+            dates.append(date[0])
+            volumes.append(volume[0])
+        chart = pygal.Line(show_y_guides=False)
+        chart.title = "Tweet Volumes (" + l + ")"
+        chart.x_labels = dates
+        chart.add("tweets per second", volumes)
+        filename = "data/_tweet_volumes_" + l + ".svg"
+        chart.render_to_file(filename)
 
 def dump_languages_graph():
     debug_print(sys._getframe().f_code.co_name)
@@ -1904,6 +1952,7 @@ def dump_data():
     dump_captured_languages_graph()
     dump_targets_graph()
     dump_keywords_graph()
+    dump_tweet_volume_graphs()
 
     debug_print("Completed dump...")
     return
@@ -2490,17 +2539,19 @@ def dump_event():
             print "Serialization took: " + str(serialize_time) + " seconds."
         print "Processed " + str(get_counter("tweets_processed_this_interval")) + " tweets this " + str(get_counter("dump_interval")) + " second interval."
         print "Tweets encountered: " + str(get_counter("tweets_encountered")) + ", captured: " + str(get_counter("tweets_captured")) + ", processed: " + str(get_counter("tweets_processed"))
-        print "Tweets per second: " + str(float(float(get_counter("tweets_processed_this_interval"))/float(get_counter("dump_interval"))))
+        tps = float(float(get_counter("tweets_processed_this_interval"))/float(get_counter("dump_interval")))
+        print "Tweets per second: " + str("%.2f" % tps)
         set_counter("tweets_processed_this_interval", 0)
         set_counter("previous_dump_time", int(time.time()))
         set_counter("processing_time", processing_time)
-        set_counter("dump_interval", conf["params"]["default_dump_interval"] + processing_time)
+        #set_counter("dump_interval", conf["params"]["default_dump_interval"] + processing_time)
         increment_counter("successful_loops")
         print "Executed " + str(get_counter("successful_loops")) + " successful loops."
         total_running_time = end_time - get_counter("script_start_time")
         print "Running as " + acct_name + " since " + script_start_time_str + " (" + str(total_running_time) + " seconds)"
         current_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
         print "Current time is: " + current_time_str
+        record_tweet_volume("all_tweets", current_time_str, tps)
         print
         return
 
