@@ -1121,6 +1121,7 @@ def cleanup():
             print "Waiting for queue to empty..."
             tweet_queue.join()
     dump_file_handle.close()
+    volume_file_handle.close()
     print "Serializing data..."
     serialize_data()
 
@@ -1303,7 +1304,7 @@ def dump_tweet_volume_graphs():
             volume = items.values()
             dates.append(date[0])
             volumes.append(volume[0])
-        chart = pygal.Line(show_y_guides=False)
+        chart = pygal.Line(show_y_guides=False, show_dots=False)
         chart.title = "Tweet Volumes (" + l + ")"
         chart.x_labels = dates
         chart.add("tweets per second", volumes)
@@ -2500,17 +2501,17 @@ def capture_status_items(status):
 ########################
 def dump_event():
     debug_print(sys._getframe().f_code.co_name)
-    global data
+    global data, volume_file_handle
     if int(time.time()) > get_counter("previous_dump_time") + get_counter("dump_interval"):
         start_time = int(time.time())
         gathering_time = start_time - get_counter("previous_dump_time") - get_counter("dump_interval")
-        print
-        print "Gathering took: " + str(gathering_time) + " seconds."
+        output = "\n\n"
+        output += "Gathering took: " + str(gathering_time) + " seconds.\n"
         if collect_only == False:
             dump_data()
         end_time = int(time.time())
         dump_time = end_time - start_time
-        print "Data dump took: " + str(dump_time) + " seconds."
+        output += "Data dump took: " + str(dump_time) + " seconds.\n"
         graph_dump_time = 0
         if threaded == True:
             if int(time.time()) > int(get_counter("previous_graph_dump_time") + conf["params"]["graph_dump_interval"]):
@@ -2519,7 +2520,7 @@ def dump_event():
                 set_counter("previous_graph_dump_time", int(time.time()))
                 end_time = int(time.time())
                 graph_dump_time = end_time - start_time
-                print "Graph dump took: " + str(graph_dump_time) + " seconds."
+                output += "Graph dump took: " + str(graph_dump_time) + " seconds.\n"
         serialize_time = 0
         if threaded == True:
             if int(time.time()) > int(get_counter("previous_serialize") + conf["params"]["serialization_interval"]):
@@ -2528,30 +2529,31 @@ def dump_event():
                 set_counter("previous_serialize", int(time.time()))
                 end_time = int(time.time())
                 serialize_time = end_time - start_time
-                print "Serialization took: " + str(serialize_time) + " seconds."
+                output += "Serialization took: " + str(serialize_time) + " seconds.\n"
         current_time = int(time.time())
         processing_time = current_time - get_counter("previous_dump_time")
         if threaded == True:
             queue_length = tweet_queue.qsize()
-            print str(queue_length) + " items in the queue."
+            output += str(queue_length) + " items in the queue.\n"
             active_threads = get_active_threads()
-            print str(active_threads) + " threads active."
-        print "Processed " + str(get_counter("tweets_processed_this_interval")) + " tweets during the last " + str(processing_time) + " seconds."
-        print "Tweets encountered: " + str(get_counter("tweets_encountered")) + ", captured: " + str(get_counter("tweets_captured")) + ", processed: " + str(get_counter("tweets_processed"))
+            output += str(active_threads) + " threads active.\n"
+        output += "Processed " + str(get_counter("tweets_processed_this_interval")) + " tweets during the last " + str(processing_time) + " seconds.\n"
+        output += "Tweets encountered: " + str(get_counter("tweets_encountered")) + ", captured: " + str(get_counter("tweets_captured")) + ", processed: " + str(get_counter("tweets_processed")) + "\n"
         tps = float(float(get_counter("tweets_processed_this_interval"))/float(processing_time))
-        print "Tweets per second: " + str("%.2f" % tps)
+        output += "Tweets per second: " + str("%.2f" % tps) + "\n"
         set_counter("tweets_processed_this_interval", 0)
         set_counter("previous_dump_time", int(time.time()))
         set_counter("processing_time", processing_time)
         #set_counter("dump_interval", conf["params"]["default_dump_interval"] + processing_time)
         increment_counter("successful_loops")
-        print "Executed " + str(get_counter("successful_loops")) + " successful loops."
+        output += "Executed " + str(get_counter("successful_loops")) + " successful loops.\n"
         total_running_time = end_time - get_counter("script_start_time")
-        print "Running as " + acct_name + " since " + script_start_time_str + " (" + str(total_running_time) + " seconds)"
+        output += "Running as " + acct_name + " since " + script_start_time_str + " (" + str(total_running_time) + " seconds)\n"
         current_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
-        print "Current time is: " + current_time_str
+        output += "Current time is: " + current_time_str + "\n\n"
         record_tweet_volume("all_tweets", current_time_str, tps)
-        print
+        print output
+        volume_file_handle.write(current_time_str + "\t" + str("%.2f" % tps) + "\n")
         return
 
 ############################
@@ -2712,6 +2714,7 @@ if __name__ == '__main__':
 
     init_tweet_processor()
     dump_file_handle = open("data/raw/raw.json", "a")
+    volume_file_handle = open("data/_tweet_volumes.txt", "a")
 
 # Start a thread to process incoming tweets
     if threaded == True:
