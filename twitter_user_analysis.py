@@ -192,8 +192,10 @@ if __name__ == '__main__':
         entry = date_string + " | " + status.text + "\n"
         tweet_texts.append(entry)
 
+        replied_user = ""
         if hasattr(status, 'in_reply_to_screen_name'):
             if status.in_reply_to_screen_name is not None:
+                replied_user = status.in_reply_to_screen_name
                 increment_counter("replied_to", status.in_reply_to_screen_name)
                 replies += 1
 
@@ -203,6 +205,7 @@ if __name__ == '__main__':
             increment_counter("languages", status.lang)
 
         retweeted = False
+        retweeted_user = ""
         if hasattr(status, 'retweeted_status'):
             orig_tweet = status.retweeted_status
             if hasattr(orig_tweet, 'user'):
@@ -213,6 +216,7 @@ if __name__ == '__main__':
                             increment_counter("retweeted", retweeted_user)
                             retweeted = True
 
+        quoted_user = ""
         if hasattr(status, 'quoted_status'):
             orig_tweet = status.quoted_status
             if 'user' in orig_tweet:
@@ -253,10 +257,11 @@ if __name__ == '__main__':
                     if item is not None:
                         mention = item['screen_name']
                         if mention is not None:
-                            if retweeted is True:
-                                increment_counter("retweeted_mentions", mention)
-                            else:
-                                increment_counter("mentions", mention)
+                            if mention != replied_user and mention != quoted_user:
+                                if retweeted is True:
+                                    increment_counter("retweeted_mentions", mention)
+                                else:
+                                    increment_counter("mentions", mention)
 
 # get user agents
         increment_counter("sources", status.source)
