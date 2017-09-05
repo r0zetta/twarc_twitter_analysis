@@ -1374,11 +1374,26 @@ def dump_keywords_graph():
 def is_graph_printable(name):
     debug_print(sys._getframe().f_code.co_name)
     ret = True
+    if "settings" in conf:
+        if "monitored_langs" in conf["settings"]:
+            if len(conf["settings"]["monitored_langs"]) == 0:
+                if re.search("^words_.+$", name) is not None:
+                    ret = False
+    if re.search("^monitored_.+$", name) is not None:
+        ret = False
     if re.search("^keyword_.+$", name) is not None:
         ret = False
     if re.search("^url_keyword_.+$", name) is not None:
         ret = False
     if "tweets" in name:
+        ret = False
+    if "description" in name:
+        ret = False
+    if "fake_news" in name:
+        ret = False
+    if "source" in name:
+        ret = False
+    if "url" in name:
         ret = False
     return ret
 
