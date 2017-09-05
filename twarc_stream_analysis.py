@@ -1395,6 +1395,10 @@ def is_graph_printable(name):
         ret = False
     if "url" in name:
         ret = False
+    if name == "monitored_hashtags":
+        ret = True
+    if name == "keywords":
+        ret = True
     return ret
 
 def dump_overall_object_graphs(data_type):
@@ -1791,8 +1795,9 @@ def determine_dump_filename(data_type, category, label):
             dirname += "url_keyword/"
         if label.startswith("keyword_"):
             dirname += "keyword/"
-        if label.startswith("monitored_"):
-            dirname += "monitored/"
+        if label != "monitored_hashtags":
+            if label.startswith("monitored_"):
+                dirname += "monitored/"
     filename = dirname + label + ".txt"
     if not os.path.exists(dirname):
         os.makedirs(dirname)
