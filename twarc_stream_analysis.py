@@ -1319,10 +1319,12 @@ def dump_tweet_volume_graphs():
             volume = items.values()
             dates.append(date[0])
             volumes.append(volume[0])
-        chart = pygal.Line(show_y_guides=False, show_dots=False)
+        num_points = len(dates)
+        point_every = num_points/5
+        chart = pygal.Line(show_y_guides=True, show_dots=False, x_labels_major_every=point_every, show_minor_x_labels=False, show_minor_y_labels=False, x_label_rotation=20)
         chart.title = "Tweet Volumes (" + l + ")"
         chart.x_labels = dates
-        chart.add("tweets per second", volumes)
+        chart.add("tweets/second", volumes)
         filename = "data/_tweet_volumes_" + l + ".svg"
         chart.render_to_file(filename)
 
@@ -1932,9 +1934,16 @@ def dump_highly_retweeted():
     filename = "data/custom/highly_retweeted.txt"
     handle = io.open(filename, 'w', encoding='utf-8')
     rt_data = get_highly_retweeted()
+    total = 0
+    highest = 0
     for text, count in sorted(rt_data.items(), key=lambda x:x[1], reverse=True):
+        total += 1
+        if count > highest:
+            highest = count
         handle.write(unicode(count) + u"\t" + unicode(text) + u"\n")
     handle.close()
+    set_counter("highly_retweeted", total)
+    set_counter("highest_retweeted", highest)
 
 
 ###################
@@ -2067,8 +2076,11 @@ def process_tweet(status):
         add_graphing_data("sources", info["name"], info["source"])
     if "retweet_count" in status:
         info["retweet_count"] = status["retweet_count"]
-        if int(info["retweet_count"]) > 1000:
-            record_highly_retweeted(info["text"], info["retweet_count"])
+        if "retweet_text" in status:
+            info["retweet_text"] = status["retweet_text"]
+        if int(info["retweet_count"]) > 1000 and "retweet_text" in info:
+            printable_text = info["retweet_text"].replace("\n", " ")
+            record_highly_retweeted(printable_text, info["retweet_count"])
     info["account_age_days"] = 0
     info["num_tweets"] = 0
     if "account_created_at" in info:
@@ -2464,6 +2476,10 @@ def capture_status_items(status):
             if orig_tweet["user"] is not None:
                 if "retweet_count" in orig_tweet:
                     captured_status["retweet_count"] = orig_tweet["retweet_count"]
+                if "full_text" in orig_tweet:
+                    captured_status["retweet_text"] = orig_tweet["full_text"]
+                elif "text" in orig_tweet:
+                    captured_status["retweet_text"] = orig_tweet["text"]
                 if "screen_name" in orig_tweet["user"]:
                     if orig_tweet["user"]["screen_name"] is not None:
                         captured_status["retweeted_screen_name"] = orig_tweet["user"]["screen_name"]
@@ -2479,10 +2495,17 @@ def capture_status_items(status):
         orig_tweet = status["quoted_status"]
         if "user" in orig_tweet:
             if orig_tweet["user"] is not None:
+                if "retweet_count" in orig_tweet:
+                    captured_status["retweet_count"] = orig_tweet["retweet_count"]
+                if "full_text" in orig_tweet:
+                    captured_status["retweet_text"] = orig_tweet["full_text"]
+                elif "text" in orig_tweet:
+                    captured_status["retweet_text"] = orig_tweet["text"]
                 if "screen_name" in orig_tweet["user"]:
                     if orig_tweet["user"]["screen_name"] is not None:
                         captured_status["quote_tweeted_screen_name"] = orig_tweet["user"]["screen_name"]
                         captured_status["quote_tweet"] = True
+
 # entities data (hashtags, urls, mentions)
     if "entities" in status:
         entities = status["entities"]

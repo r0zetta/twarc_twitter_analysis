@@ -30,6 +30,9 @@ data = {}
 conf = {}
 acct_name = ""
 script_start_time_str = ""
+output_dir = ""
+serialize_dir = ""
+dump_dir = ""
 
 def init_params():
     debug_print(sys._getframe().f_code.co_name)
@@ -67,7 +70,12 @@ def init_config():
 
 def init_tweet_processor():
     debug_print(sys._getframe().f_code.co_name)
-    directories = ["searcher_serialized", "data/searcher", "data/searcher/raw"]
+    global output_dir, dump_dir, serialize_dir
+    date_string = str(int(time.time()))
+    output_dir = "captures/searches/" + date_string + "/"
+    dump_dir = "captures/searches/" + date_string + "/raw/"
+    serialize_dir = "captures/searches/" + date_string + "/serialized/"
+    directories = [output_dir, dump_dir, serialize_dir]
     for dir in directories:
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -231,7 +239,7 @@ def get_all_counters():
 ###############
 def serialize_variable(variable, filename):
     debug_print(sys._getframe().f_code.co_name)
-    serialize_dir = "searcher_serialized"
+    global serialize_dir
     filename = serialize_dir + "/" + filename + ".json"
     handle = open(filename, 'w')
     json.dump(variable, handle, indent=4)
@@ -240,7 +248,7 @@ def serialize_variable(variable, filename):
 
 def unserialize_variable(varname):
     debug_print(sys._getframe().f_code.co_name)
-    serialize_dir = "searcher_serialized"
+    global serialize_dir
     if(os.path.exists(serialize_dir)):
         filename = serialize_dir + "/" + varname + ".json"
         if(os.path.exists(filename)):
@@ -256,9 +264,9 @@ def unserialize_variable(varname):
 def serialize_data():
     debug_print(sys._getframe().f_code.co_name)
     debug_print("Serializing...")
-    serialize_dir = "searcher_serialized"
-    tmp_dir = "serialized.tmp"
-    old_dir = "serialized.old"
+    global serialize_dir
+    tmp_dir = serialize_dir[:-1] + ".tmp"
+    old_dir = serialize_dir[:-1] + ".old"
     if not os.path.exists(old_dir):
         if os.path.exists(tmp_dir):
             os.rename(tmp_dir, old_dir)
@@ -404,19 +412,6 @@ def cleanup():
     print "Serializing data..."
     serialize_data()
 
-def log_stacktrace():
-    debug_print(sys._getframe().f_code.co_name)
-    exc_type, exc_value, exc_traceback = sys.exc_info()
-    timestr = str(int(time.time()))
-    filename = "searcher_errors/" + timestr + "trace.txt"
-    if not os.path.exists("searcher_errors/"):
-        os.makedirs("searcher_errors/")
-    handle = open(filename, "w")
-    traceback.print_exc(file=handle)
-    traceback.print_stack(file=handle)
-    traceback.print_tb(exc_traceback, file=handle)
-    handle.close
-
 def dump_pie_chart(dirname, filename, title, data):
     debug_print(sys._getframe().f_code.co_name)
     if not os.path.exists(dirname):
@@ -435,7 +430,8 @@ def dump_pie_chart(dirname, filename, title, data):
 
 def dump_counters():
     debug_print(sys._getframe().f_code.co_name)
-    handle = io.open("data/searcher/_collector_counters.txt", "w", encoding='utf-8')
+    filename = output_dir + "_collector_counters.txt"
+    handle = io.open(filename, "w", encoding='utf-8')
     counter_dump = get_all_counters()
     if counter_dump is not None:
         for n, c in sorted(counter_dump.iteritems(), key=lambda x:x[0], reverse=False):
@@ -452,7 +448,7 @@ def dump_languages_graph():
             if m is not None:
                 item = m.group(1)
                 chart_data[item] = value
-        dirname = "data/searcher/"
+        dirname = output_dir
         filename = "_lang_breakdown.svg"
         title = "Language breakdown"
         dump_pie_chart(dirname, filename, title, chart_data)
@@ -608,8 +604,6 @@ def dump_event():
         dump_counters()
         dump_languages_graph()
         serialize_data()
-        dump_file_handle.flush()
-        os.fsync(dump_file_handle)
         end_time = int(time.time())
         processing_time = gathering_time
         print
@@ -654,13 +648,19 @@ if __name__ == '__main__':
         exit_correctly = True
 
     init_tweet_processor()
-    dump_file_handle = open("data/searcher/raw/raw.json", "a")
+    dump_filename = dump_dir + "raw.json"
+    full_dump_filename = dump_dir + "full.json"
+    dump_file_handle = open(dump_filename, "a")
+    full_dump_file_handle = open(full_dump_filename, "a")
 
     targets = read_config_unicode("config/searcher_targets.txt")
     if len(targets) > 0:
         searches = targets
     else:
         print "Please add search targets in config/searcher_targets.txt"
+        sys.exit(0)
+    if len(searches) != 1:
+        print "Please supply exactly one search."
         sys.exit(0)
     print "Search targets:"
     print searches
@@ -671,6 +671,8 @@ if __name__ == '__main__':
     for status in t.search(searches):
         captured_status = {}
         increment_counter("tweets_encountered")
+        json.dump(status, full_dump_file_handle)
+        full_dump_file_handle.write("\n")
         if "lang" in status:
             lang = status["lang"]
             increment_counter("tweets_" + lang)
