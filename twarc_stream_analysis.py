@@ -1841,7 +1841,7 @@ def dump_dicts(raw_data, data_type, category, label):
             break
         if count > w:
             w = count
-        handle.write(unicode(tag) + u"," + unicode(count) + u"\n")
+        handle.write(unicode(count) + "\t" + unicode(tag) +  u"\n")
         c += 1
     handle.close()
 
@@ -1895,7 +1895,8 @@ def dump_interarrivals():
             for name, value in raw_data.iteritems():
                 output_data[name] = str(value)
             for name, count in sorted(output_data.items(), key=lambda x:x[1], reverse=True):
-                output_string += unicode(name) + u" | " + unicode(count) + u"\n"
+                count_str = "%.2f" % float(count)
+                output_string += unicode(count_str) + u"\t" + unicode(name) + u"\n"
             debug_print("Writing custom file: " + filename)
             handle = io.open(filename, 'w', encoding='utf-8')
             handle.write(output_string)
