@@ -376,6 +376,21 @@ def get_from_list_data(variable, category, name):
 # Custom storage and wrappers
 #############################
 
+def record_highly_retweeted(text, count):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    if "highly_retweeted" not in data:
+        data["highly_retweeted"] = {}
+    data["highly_retweeted"][text] = count
+
+def get_highly_retweeted():
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    ret = {}
+    if "highly_retweeted" in data:
+        ret = data["highly_retweeted"]
+    return ret
+
 def record_tweet_volume(label, timestamp, value):
     debug_print(sys._getframe().f_code.co_name)
     global data
@@ -1912,6 +1927,16 @@ def dump_userinfo():
             handle.write(u"\n")
         handle.close
 
+def dump_highly_retweeted():
+    debug_print(sys._getframe().f_code.co_name)
+    filename = "data/custom/highly_retweeted.txt"
+    handle = io.open(filename, 'w', encoding='utf-8')
+    rt_data = get_highly_retweeted()
+    for text, count in sorted(rt_data.items(), key=lambda x:x[1], reverse=True):
+        handle.write(unicode(count) + u"\t" + unicode(text) + u"\n")
+    handle.close()
+
+
 ###################
 # Data dump routine
 ###################
@@ -1968,6 +1993,7 @@ def dump_data():
     dump_associations()
 
     debug_print("Dumping counters.")
+    dump_highly_retweeted()
     dump_counters()
     dump_languages_graph()
     dump_captured_languages_graph()
@@ -2039,6 +2065,10 @@ def process_tweet(status):
     if "source" in info:
         add_data("metadata", "source", info["source"])
         add_graphing_data("sources", info["name"], info["source"])
+    if "retweet_count" in status:
+        info["retweet_count"] = status["retweet_count"]
+        if int(info["retweet_count"]) > 1000:
+            record_highly_retweeted(info["text"], info["retweet_count"])
     info["account_age_days"] = 0
     info["num_tweets"] = 0
     if "account_created_at" in info:
@@ -2432,6 +2462,8 @@ def capture_status_items(status):
         orig_tweet = status["retweeted_status"]
         if "user" in orig_tweet:
             if orig_tweet["user"] is not None:
+                if "retweet_count" in orig_tweet:
+                    captured_status["retweet_count"] = orig_tweet["retweet_count"]
                 if "screen_name" in orig_tweet["user"]:
                     if orig_tweet["user"]["screen_name"] is not None:
                         captured_status["retweeted_screen_name"] = orig_tweet["user"]["screen_name"]
