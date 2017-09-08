@@ -2,6 +2,7 @@
 from twarc import Twarc
 from authentication_keys import get_account_credentials
 from datetime import datetime, date, time, timedelta
+import shutil
 import pygal
 import numpy as np
 import Queue
@@ -79,6 +80,7 @@ def init_tweet_processor():
     for dir in directories:
         if not os.path.exists(dir):
             os.makedirs(dir)
+    shutil.copy2('config/searcher_targets.txt', output_dir)
     deserialize_data()
     init_params()
     init_config()
@@ -179,12 +181,14 @@ def del_category_from_storage(variable, category):
 
 def get_category_storage(variable, category):
     debug_print(sys._getframe().f_code.co_name)
+    global data
     if variable in data:
         if category in data[variable]:
             return data[variable][category]
 
 def get_all_storage(variable):
     debug_print(sys._getframe().f_code.co_name)
+    global data
     if variable in data:
         return data[variable]
 
@@ -428,6 +432,15 @@ def dump_pie_chart(dirname, filename, title, data):
         pie_chart.add(label, c)
     pie_chart.render_to_file(filepath)
 
+def dump_line_graph(chart_title, y_axis_label, x_axis_labels, plot_data):
+    debug_print(sys._getframe().f_code.co_name)
+    filename = output_dir + "retweet_volumes.svg"
+    chart = pygal.Line(show_y_guides=True, show_dots=False, x_labels_major_count=5, show_minor_x_labels=False, show_minor_y_labels=False, x_label_rotation=20)
+    chart.title = chart_title
+    chart.x_labels = x_axis_labels
+    chart.add(y_axis_label, plot_data)
+    chart.render_to_file(filename)
+
 def dump_counters():
     debug_print(sys._getframe().f_code.co_name)
     filename = output_dir + "_collector_counters.txt"
@@ -452,6 +465,53 @@ def dump_languages_graph():
         filename = "_lang_breakdown.svg"
         title = "Language breakdown"
         dump_pie_chart(dirname, filename, title, chart_data)
+
+def dump_retweet_graph():
+    debug_print(sys._getframe().f_code.co_name)
+    output_data = get_category_storage("retweet_heatmap", "per_minute_data")
+    if output_data is None:
+        return
+    x_axis_labels = []
+    plot_data = []
+    chart_title = "retweet volume"
+    y_axis_label = "tweets/minute"
+    for name, count in sorted(output_data.items(), key=lambda x:x[0], reverse=False):
+        x_axis_labels.append(name)
+        plot_data.append(count)
+    dump_line_graph(chart_title, y_axis_label, x_axis_labels, plot_data)
+
+def record_per_minute_retweets(status):
+    debug_print(sys._getframe().f_code.co_name)
+    created_at = ""
+    if "created_at" in status:
+        created_at = status["created_at"][:-3]
+    if created_at != "":
+        increment_storage("retweet_heatmap", "per_minute_data", created_at)
+
+def record_retweeters(status):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    created_at = ""
+    screen_name = ""
+    if "created_at" in status:
+        created_at = status["created_at"]
+    if "screen_name" in status:
+        screen_name = status["screen_name"]
+    if "retweeters" not in data:
+        data["retweeters"] = {}
+    data["retweeters"][screen_name] = created_at
+
+def dump_retweeter_list():
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    filename = output_dir + "retweeters.txt"
+    handle = io.open(filename, "w", encoding='utf-8')
+    if "retweeters" in data:
+        if data["retweeters"] is not None:
+            for name, date in sorted(data["retweeters"].items(), key=lambda x:x[1], reverse=False):
+                handle.write(date + "\t" + name + "\n")
+            handle.close
+
 
 def reload_settings():
     debug_print(sys._getframe().f_code.co_name)
@@ -586,6 +646,16 @@ def capture_status_items(status):
     return captured_status
 
 ############################
+# Process captured status
+############################
+def process_status(status):
+    debug_print(sys._getframe().f_code.co_name)
+    if "retweet" in status:
+        if status["retweet"] == True:
+            record_per_minute_retweets(status)
+            record_retweeters(status)
+
+############################
 # Manage all periodic events
 ############################
 def periodic_events():
@@ -602,6 +672,8 @@ def dump_event():
         start_time = int(time.time())
         gathering_time = start_time - get_counter("previous_dump_time") - get_counter("dump_interval")
         dump_counters()
+        dump_retweet_graph()
+        dump_retweeter_list()
         dump_languages_graph()
         serialize_data()
         end_time = int(time.time())
@@ -671,27 +743,27 @@ if __name__ == '__main__':
     for status in t.search(searches):
         captured_status = {}
         increment_counter("tweets_encountered")
-        json.dump(status, full_dump_file_handle)
+        #json.dump(status, full_dump_file_handle)
         full_dump_file_handle.write("\n")
         if "lang" in status:
             lang = status["lang"]
             increment_counter("tweets_" + lang)
-            if len(conf["settings"]["monitored_langs"]) > 0:
-                if lang not in conf["settings"]["monitored_langs"]:
-                    debug_print("Skipping tweet of lang: " + lang)
-                    sys.stdout.write("-")
-                    sys.stdout.flush()
-                else:
-                    captured_status = capture_status_items(status)
-                    if captured_status is not None:
-                        increment_counter("tweets_captured")
-                        increment_counter("tweets_processed")
-                        increment_counter("tweets_processed_this_interval")
-                        json.dump(captured_status, dump_file_handle)
-                        dump_file_handle.write("\n")
-                        periodic_events()
-                    sys.stdout.write("#")
-                    sys.stdout.flush()
+            captured_status = capture_status_items(status)
+            process_status(captured_status)
+            if captured_status is not None:
+                increment_counter("tweets_captured")
+                increment_counter("tweets_processed")
+                increment_counter("tweets_processed_this_interval")
+                json.dump(captured_status, dump_file_handle)
+                dump_file_handle.write("\n")
+                periodic_events()
+            sys.stdout.write("#")
+            sys.stdout.flush()
     dump_counters()
     dump_languages_graph()
+    dump_retweet_graph()
+    dump_retweeter_list()
     serialize_data()
+    print
+    print "Done."
+    print
