@@ -401,10 +401,13 @@ def delete_retweet_frequency(delete_list):
     debug_print(sys._getframe().f_code.co_name)
     return
     global data
+    purged = 0
     for text in delete_list:
+        purged += 1
         del data["retweet_frequency"]["first_seen_retweet"][text]
         del data["retweet_frequency"]["previous_seen_retweet"][text]
         del data["retweet_frequency"]["retweet_counter"][text]
+    print "Purged " + str(purged) + " old retweet frequency records."
 
 def set_retweet_spike_data(text, first_seen, last_seen, count):
     debug_print(sys._getframe().f_code.co_name)
@@ -435,6 +438,7 @@ def dump_retweet_spikes():
         spike_count = 0
         for text, stuff in data["retweet_spikes"].iteritems():
             spike_count += 1
+            text = text.replace('\n', ' ')
             handle.write(u"Tweet:\t" + unicode(text) + u"\n")
             handle.write(u"Start time:\t" + unicode(unix_time_to_readable(stuff["first_seen"])) + u"\n")
             handle.write(u"End time:\t" + unicode(unix_time_to_readable(stuff["last_seen"])) + u"\n")
