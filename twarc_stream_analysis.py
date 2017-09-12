@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from twarc import Twarc
 from authentication_keys import get_account_credentials
 from datetime import datetime, date, time, timedelta
@@ -29,6 +30,7 @@ collect_only = False
 exit_correctly = False
 searches = []
 tweet_queue = None
+analyzer = None
 targets = []
 data = {}
 conf = {}
@@ -2565,11 +2567,8 @@ def process_tweet(status):
 ############################
 def capture_status_items(status):
     debug_print(sys._getframe().f_code.co_name)
+    global analyzer
     captured_status = {}
-    if "lang" in status:
-        captured_status["lang"] = status["lang"]
-    else:
-        return
     if "created_at" in status:
         captured_status["created_at"] = twarc_time_to_readable(status["created_at"])
     else:
@@ -2582,6 +2581,13 @@ def capture_status_items(status):
         captured_status["text"] = ' '.join(status["full_text"].split())
     elif "text" in status:
         captured_status["text"] = ' '.join(status["text"].split())
+    else:
+        return
+    if "lang" in status:
+        captured_status["lang"] = status["lang"]
+        if status["lang"] == "en":
+            vs = analyzer.polarity_scores(captured_status["text"])
+            captured_status["sentiment"] = vs["compound"]
     else:
         return
     if "source" in status:
@@ -2913,6 +2919,7 @@ if __name__ == '__main__':
     init_tweet_processor()
     dump_file_handle = open("data/raw/raw.json", "a")
     volume_file_handle = open("data/_tweet_volumes.txt", "a")
+    analyzer = SentimentIntensityAnalyzer()
 
 # Start a thread to process incoming tweets
     if threaded == True:
