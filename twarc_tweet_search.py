@@ -434,7 +434,7 @@ def dump_pie_chart(dirname, filename, title, data):
 
 def dump_line_graph(chart_title, y_axis_label, x_axis_labels, plot_data):
     debug_print(sys._getframe().f_code.co_name)
-    filename = output_dir + "retweet_volumes.svg"
+    filename = output_dir + chart_title + ".svg"
     chart = pygal.Line(show_y_guides=True, show_dots=False, x_labels_major_count=5, show_minor_x_labels=False, show_minor_y_labels=False, x_label_rotation=20)
     chart.title = chart_title
     chart.x_labels = x_axis_labels
@@ -466,29 +466,35 @@ def dump_languages_graph():
         title = "Language breakdown"
         dump_pie_chart(dirname, filename, title, chart_data)
 
-def dump_retweet_graph():
+def dump_chronology_graphs():
     debug_print(sys._getframe().f_code.co_name)
-    output_data = get_category_storage("retweet_heatmap", "per_minute_data")
+    lists = ["retweet_heatmap", "reply_heatmap", "tweet_heatmap"]
+    for l in lists:
+        dump_chronology_graph(l)
+
+def dump_chronology_graph(label):
+    debug_print(sys._getframe().f_code.co_name)
+    output_data = get_category_storage(label, "per_minute_data")
     if output_data is None:
         return
     x_axis_labels = []
     plot_data = []
-    chart_title = "retweet volume"
+    chart_title = label
     y_axis_label = "tweets/minute"
     for name, count in sorted(output_data.items(), key=lambda x:x[0], reverse=False):
         x_axis_labels.append(name)
         plot_data.append(count)
     dump_line_graph(chart_title, y_axis_label, x_axis_labels, plot_data)
 
-def record_per_minute_retweets(status):
+def record_per_minute(category, status):
     debug_print(sys._getframe().f_code.co_name)
     created_at = ""
     if "created_at" in status:
         created_at = status["created_at"][:-3]
     if created_at != "":
-        increment_storage("retweet_heatmap", "per_minute_data", created_at)
+        increment_storage(category, "per_minute_data", created_at)
 
-def record_retweeters(status):
+def record_chronology(category, status):
     debug_print(sys._getframe().f_code.co_name)
     global data
     created_at = ""
@@ -497,21 +503,26 @@ def record_retweeters(status):
         created_at = status["created_at"]
     if "screen_name" in status:
         screen_name = status["screen_name"]
-    if "retweeters" not in data:
-        data["retweeters"] = {}
-    data["retweeters"][screen_name] = created_at
+    if category not in data:
+        data[category] = {}
+    data[category][created_at] = screen_name
 
-def dump_retweeter_list():
+def dump_chronology_lists():
+    debug_print(sys._getframe().f_code.co_name)
+    lists = ["retweeters", "repliers", "original_tweets"]
+    for l in lists:
+        dump_chronology_data(l)
+
+def dump_chronology_data(label):
     debug_print(sys._getframe().f_code.co_name)
     global data
-    filename = output_dir + "retweeters.txt"
+    filename = output_dir + label + ".txt"
     handle = io.open(filename, "w", encoding='utf-8')
-    if "retweeters" in data:
-        if data["retweeters"] is not None:
-            for name, date in sorted(data["retweeters"].items(), key=lambda x:x[1], reverse=False):
+    if label in data:
+        if data[label] is not None:
+            for date, name in sorted(data[label].items(), key=lambda x:x[0], reverse=False):
                 handle.write(date + "\t" + name + "\n")
             handle.close
-
 
 def reload_settings():
     debug_print(sys._getframe().f_code.co_name)
@@ -557,6 +568,7 @@ def capture_status_items(status):
             captured_status["source"] = m.group(1)
     if "in_reply_to_screen_name" in status:
         captured_status["in_reply_to_screen_name"] = status["in_reply_to_screen_name"]
+        captured_status["reply"] = True
 # retweet data
     if "retweeted_status" in status:
         orig_tweet = status["retweeted_status"]
@@ -650,10 +662,26 @@ def capture_status_items(status):
 ############################
 def process_status(status):
     debug_print(sys._getframe().f_code.co_name)
+    retweet = False
+    reply = False
     if "retweet" in status:
         if status["retweet"] == True:
-            record_per_minute_retweets(status)
-            record_retweeters(status)
+            retweet = True
+    if "reply" in status:
+        if status["reply"] == True:
+            reply = True
+    if retweet == True:
+        record_per_minute("retweet_heatmap", status)
+        record_chronology("retweeters", status)
+        increment_counter("retweets")
+    elif reply == True:
+        record_per_minute("reply_heatmap", status)
+        record_chronology("repliers", status)
+        increment_counter("replies")
+    else:
+        record_per_minute("tweet_heatmap", status)
+        record_chronology("original_tweets", status)
+        increment_counter("original_tweets")
 
 ############################
 # Manage all periodic events
@@ -672,8 +700,8 @@ def dump_event():
         start_time = int(time.time())
         gathering_time = start_time - get_counter("previous_dump_time") - get_counter("dump_interval")
         dump_counters()
-        dump_retweet_graph()
-        dump_retweeter_list()
+        dump_chronology_graphs()
+        dump_chronology_lists()
         dump_languages_graph()
         serialize_data()
         end_time = int(time.time())
@@ -761,8 +789,8 @@ if __name__ == '__main__':
             sys.stdout.flush()
     dump_counters()
     dump_languages_graph()
-    dump_retweet_graph()
-    dump_retweeter_list()
+    dump_chronology_graphs()
+    dump_chronology_lists()
     serialize_data()
     print
     print "Done."

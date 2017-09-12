@@ -46,6 +46,8 @@ def init_params():
     conf["params"]["min_tweets_for_suspicious"] = 10
     conf["params"]["data_handling"] = "purge"
     conf["params"]["purge_interval"] = 300
+    conf["params"]["retweet_spike_window"] = 10 * 60
+    conf["params"]["retweet_spike_minimum"] = 100
     conf["params"]["time_to_live"] = 8 * 60 * 60
     conf["params"]["max_to_output"] = 250
     if test is True:
@@ -375,6 +377,91 @@ def get_from_list_data(variable, category, name):
 #############################
 # Custom storage and wrappers
 #############################
+
+def record_retweet_frequency(text, timestamp):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    if "retweet_frequency" not in data:
+        data["retweet_frequency"] = {}
+    if "first_seen_retweet" not in data["retweet_frequency"]:
+        data["retweet_frequency"]["first_seen_retweet"] = {}
+    if text not in data["retweet_frequency"]["first_seen_retweet"]:
+        data["retweet_frequency"]["first_seen_retweet"][text] = timestamp
+    if "previous_seen_retweet" not in data["retweet_frequency"]:
+        data["retweet_frequency"]["previous_seen_retweet"] = {}
+    data["retweet_frequency"]["previous_seen_retweet"][text] = timestamp
+    if "retweet_counter" not in data["retweet_frequency"]:
+        data["retweet_frequency"]["retweet_counter"] = {}
+    if text not in data["retweet_frequency"]["retweet_counter"]:
+        data["retweet_frequency"]["retweet_counter"][text] = 1
+    else:
+        data["retweet_frequency"]["retweet_counter"][text] += 1
+
+def delete_retweet_frequency(delete_list):
+    debug_print(sys._getframe().f_code.co_name)
+    return
+    global data
+    for text in delete_list:
+        del data["retweet_frequency"]["first_seen_retweet"][text]
+        del data["retweet_frequency"]["previous_seen_retweet"][text]
+        del data["retweet_frequency"]["retweet_counter"][text]
+
+def set_retweet_spike_data(text, first_seen, last_seen, count):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    new_count = count
+    real_first_seen = first_seen
+    if "retweet_spikes" not in data:
+        data["retweet_spikes"] = {}
+    if "retweet_spikes" in data:
+        if text in data["retweet_spikes"]:
+            old_data = data["retweet_spikes"][text]
+            new_count = count + old_data["count"]
+            real_first_seen = old_data["first_seen"]
+        else:
+            data["retweet_spikes"][text] = {}
+    spike_record = {}
+    spike_record["first_seen"] = real_first_seen
+    spike_record["last_seen"] = last_seen
+    spike_record["count"] = new_count
+    data["retweet_spikes"][text] = spike_record
+
+def dump_retweet_spikes():
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    if "retweet_spikes" in data:
+        filename = "data/custom/retweet_spikes.txt"
+        handle = io.open(filename, "w", encoding='utf-8')
+        spike_count = 0
+        for text, stuff in data["retweet_spikes"].iteritems():
+            spike_count += 1
+            handle.write(u"Tweet:\t" + unicode(text) + u"\n")
+            handle.write(u"Start time:\t" + unicode(unix_time_to_readable(stuff["first_seen"])) + u"\n")
+            handle.write(u"End time:\t" + unicode(unix_time_to_readable(stuff["last_seen"])) + u"\n")
+            handle.write(u"Count:\t" + unicode(stuff["count"]) + u"\n\n")
+        handle.close()
+        set_counter("retweet_spikes", spike_count)
+
+def process_retweet_frequency():
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    timestamp = get_utc_unix_time()
+    delete_list = []
+    if "retweet_frequency" in data:
+        if "retweet_counter" in data["retweet_frequency"]:
+            for text, count in data["retweet_frequency"]["retweet_counter"].iteritems():
+                previous_seen = data["retweet_frequency"]["previous_seen_retweet"][text]
+                interval = timestamp - previous_seen
+                if interval >= conf["params"]["retweet_spike_window"]:
+                    if count <= conf["params"]["retweet_spike_minimum"]:
+                        delete_list.append(text)
+                    else:
+                        start = data["retweet_frequency"]["first_seen_retweet"][text]
+                        end = data["retweet_frequency"]["previous_seen_retweet"][text]
+                        count = data["retweet_frequency"]["retweet_counter"][text]
+                        set_retweet_spike_data(text, start, end, count)
+    if len(delete_list) > 0:
+        delete_retweet_frequency(delete_list)
 
 def record_highly_retweeted(text, count):
     debug_print(sys._getframe().f_code.co_name)
@@ -931,6 +1018,14 @@ def time_string_to_object(time_string):
 
 def time_object_to_unix(time_object):
     return int(time_object.strftime("%s"))
+
+def get_utc_unix_time():
+    dts = datetime.utcnow()
+    epochtime = time.mktime(dts.timetuple())
+    return epochtime
+
+def unix_time_to_readable(time_string):
+    return datetime.fromtimestamp(int(time_string)).strftime('%Y-%m-%d %H:%M:%S')
 
 def get_datestring(data_type, offset):
     debug_print(sys._getframe().f_code.co_name)
@@ -1746,6 +1841,8 @@ def dump_heatmap_comparison():
     debug_print(sys._getframe().f_code.co_name)
     filename = "data/custom/global_heatmaps"
     graph_titles = []
+    graph_data = {}
+    graph_x_data = []
     titles = []
     weeks = []
     output_string = u"Date"
@@ -1759,7 +1856,6 @@ def dump_heatmap_comparison():
     for yearweek, weekdata in sorted(heatmaps[titles[0]].iteritems()):
         weeks.append(yearweek)
     weekdays = {0: "Mon", 1: "Tue", 2: "Wed", 3: "Thu", 4: "Fri", 5: "Sat", 6: "Sun"}
-    graph_data = []
     for week in weeks:
         output_string += unicode(week) + u"\n"
         for day in range(0, 7):
@@ -1774,24 +1870,36 @@ def dump_heatmap_comparison():
                             val = heatmaps[title][week][day][hour]
                             date_string = week + " " + day_name + " " + str(hour) + ":00"
                             if title in graph_titles:
-                                graph_item["date"] = date_string
-                                graph_item[title] = val
+                                if date_string not in graph_x_data:
+                                    graph_x_data.append(date_string)
+                                if title not in graph_data:
+                                    graph_data[title] = []
+                                graph_data[title].append(val)
                             this_row.append(val)
                             row_sum += val
                 if row_sum > 0:
                     output_string += unicode(day_name) + u" " + unicode(hour) + u":00"
                     output_string += u", " + u','.join(map(unicode, this_row)) + u"\n"
-                    graph_data.append(graph_item)
     debug_print("Writing custom file: " + filename)
     handle = io.open(filename + ".csv", 'w', encoding='utf-8')
     handle.write(output_string)
     handle.close()
+    ordered_x_data = list(reversed(graph_x_data))
+    ordered_x_data = ordered_x_data[:10]
+    ordered_data = {}
+    for t, d in graph_data.iteritems():
+        ordered_data[t] = list(reversed(graph_data[t]))
+        ordered_data[t] = ordered_data[t][:10]
+    #output_bar_chart(filename + ".svg", "heatmap trends", ordered_x_data, ordered_data)
+
+def output_bar_chart(filename, title, x_data, graph_data):
+    debug_print(sys._getframe().f_code.co_name)
     chart = pygal.Bar(show_y_guides=False)
-    chart.x_labels = [x['date'] for x in graph_data]
-    for name in graph_titles:
-        mark_list = [x[name] for x in graph_data]
-        chart.add(name, mark_list)
-    chart.render_to_file(filename + ".svg")
+    chart.title = title
+    chart.x_labels = x_data
+    for name, array in graph_data.iteritems():
+        chart.add(name, array)
+    chart.render_to_file(filename)
 
 def determine_dump_filename(data_type, category, label):
     debug_print(sys._getframe().f_code.co_name)
@@ -2010,6 +2118,8 @@ def dump_data():
     dump_targets_graph()
     dump_keywords_graph()
     dump_tweet_volume_graphs()
+    process_retweet_frequency()
+    dump_retweet_spikes()
 
     debug_print("Completed dump...")
     return
@@ -2128,6 +2238,8 @@ def process_tweet(status):
         info["retweeted_name"] = status["retweeted_screen_name"]
         if info["retweeted_name"] is not None:
             add_data("users", "retweeters", info["name"])
+            if "retweet_text" in status:
+                record_retweet_frequency(status["retweet_text"], info["tweet_time_unix"])
             increment_heatmap("retweets", tweet_time_object)
             increment_per_hour("retweeters", info["datestring"], info["name"])
             add_graphing_data("retweets", info["name"], info["retweeted_name"])
@@ -2624,6 +2736,7 @@ def dump_event():
         increment_counter("successful_loops")
         output += "Executed " + str(get_counter("successful_loops")) + " successful loops.\n"
         total_running_time = end_time - get_counter("script_start_time")
+        set_counter("total_running_time", total_running_time)
         output += "Running as " + acct_name + " since " + script_start_time_str + " (" + str(total_running_time) + " seconds)\n"
         current_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
         output += "Current time is: " + current_time_str + "\n\n"
