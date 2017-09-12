@@ -394,6 +394,7 @@ def record_retweet_frequency(text, timestamp):
         data["retweet_frequency"]["retweet_counter"] = {}
     if text not in data["retweet_frequency"]["retweet_counter"]:
         data["retweet_frequency"]["retweet_counter"][text] = 1
+        increment_counter("tracked_retweets")
     else:
         data["retweet_frequency"]["retweet_counter"][text] += 1
 
@@ -404,6 +405,7 @@ def delete_retweet_frequency(delete_list):
     purged = 0
     for text in delete_list:
         purged += 1
+        decrement_counter("tracked_retweets")
         del data["retweet_frequency"]["first_seen_retweet"][text]
         del data["retweet_frequency"]["previous_seen_retweet"][text]
         del data["retweet_frequency"]["retweet_counter"][text]
