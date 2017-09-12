@@ -451,15 +451,18 @@ def process_retweet_frequency():
         if "retweet_counter" in data["retweet_frequency"]:
             for text, count in data["retweet_frequency"]["retweet_counter"].iteritems():
                 previous_seen = data["retweet_frequency"]["previous_seen_retweet"][text]
-                interval = timestamp - previous_seen
-                if interval >= conf["params"]["retweet_spike_window"]:
-                    if count <= conf["params"]["retweet_spike_minimum"]:
+                first_seen = data["retweet_frequency"]["first_seen_retweet"][text]
+                time_since_last_seen = timestamp - previous_seen
+                time_since_first_seen = timestamp - first_seen
+                total_time_seen = time_since_last_seen - time_since_first_seen
+                if time_since_last_seen >= conf["params"]["retweet_spike_window"] and count <= conf["params"]["retweet_spike_minimum"]:
                         delete_list.append(text)
-                    else:
-                        start = data["retweet_frequency"]["first_seen_retweet"][text]
-                        end = data["retweet_frequency"]["previous_seen_retweet"][text]
-                        count = data["retweet_frequency"]["retweet_counter"][text]
-                        set_retweet_spike_data(text, start, end, count)
+                        continue
+                if count > conf["params"]["retweet_spike_minimum"]:
+                    start = data["retweet_frequency"]["first_seen_retweet"][text]
+                    end = data["retweet_frequency"]["previous_seen_retweet"][text]
+                    count = data["retweet_frequency"]["retweet_counter"][text]
+                    set_retweet_spike_data(text, start, end, count)
     if len(delete_list) > 0:
         delete_retweet_frequency(delete_list)
 
