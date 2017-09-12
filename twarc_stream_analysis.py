@@ -380,6 +380,14 @@ def get_from_list_data(variable, category, name):
 # Custom storage and wrappers
 #############################
 
+def record_sentiment(label, value):
+    debug_print(sys._getframe().f_code.co_name)
+    if exists_counter("sentiment_" + label):
+        old_val = get_counter("sentiment_" + label)
+        set_counter("sentiment_" + label, old_val + value)
+    else:
+        set_counter("sentiment_" + label, value)
+
 def record_retweet_frequency(text, timestamp):
     debug_print(sys._getframe().f_code.co_name)
     global data
@@ -985,6 +993,10 @@ def set_counter(name, value):
 def get_all_counters():
     debug_print(sys._getframe().f_code.co_name)
     return get_category_storage("statistics", "counters")
+
+def exists_counter(name):
+    debug_print(sys._getframe().f_code.co_name)
+    return exists_storage("statistics", "counters", name)
 
 
 ##################
@@ -2280,6 +2292,8 @@ def process_tweet(status):
                         add_data("metadata", "targets", ta)
                         increment_heatmap("target_" + ta, tweet_time_object)
                         increment_per_hour("targets", info["datestring"], ta)
+                        if "sentiment" in status:
+                            record_sentiment(t, status["sentiment"])
                 if add_data("metadata", label, t) is True:
                     increment_counter("tweet_words_seen")
         pos_words = get_positive_words(tokens)
@@ -2331,6 +2345,8 @@ def process_tweet(status):
                             increment_per_hour(label + "_tweeters", info["datestring"], info["name"])
                             increment_per_hour(label + "_tweets", info["datestring"], info["text"])
                             increment_counter(label + "_tweets")
+                            if "sentiment" in status:
+                                record_sentiment(h, status["sentiment"])
             pos_tags = get_positive_hashtags(info["hashtags"])
             info["positive_hashtags"] = len(pos_tags)
             if len(pos_tags) > 0:
@@ -2419,6 +2435,8 @@ def process_tweet(status):
                 increment_per_hour(label + "_tweets", info["datestring"], info["text"])
                 add_timeline_data(info["tweet_time_readable"], info["name"], "used monitored keyword:", k, info["tweet_id"])
                 add_data("metadata", "keyword_tweets", info["text"])
+                if "sentiment" in status:
+                    record_sentiment(k, status["sentiment"])
                 for h in info["hashtags"]:
                     increment_per_hour(label + "_hashtags", info["datestring"], h)
 
