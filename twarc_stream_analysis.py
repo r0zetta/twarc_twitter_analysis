@@ -486,7 +486,7 @@ def process_retweet_frequency():
                 first_seen = data["retweet_frequency"]["first_seen_retweet"][text]
                 time_since_last_seen = timestamp - previous_seen
                 time_since_first_seen = timestamp - first_seen
-                total_time_seen = time_since_last_seen - time_since_first_seen
+                total_time_seen = previous_seen - first_seen
                 tweets_per_second = 0
                 if total_time_seen > 0:
                     tweets_per_second = float(float(count)/float(total_time_seen))
