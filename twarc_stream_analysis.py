@@ -383,11 +383,13 @@ def get_from_list_data(variable, category, name):
 
 def record_sentiment(label, timestamp, value):
     debug_print(sys._getframe().f_code.co_name)
+    sentiment_value = 0
     if exists_counter("sentiment_" + label):
         old_val = get_counter("sentiment_" + label)
-        set_counter("sentiment_" + label, old_val + value)
+        sentiment_value = old_val + value
     else:
-        set_counter("sentiment_" + label, value)
+        sentiment_value =  value
+    set_counter("sentiment_" + label, sentiment_value)
     current_time = int(time.time())
     prev_label = "previous_sentiment_" + label
     last_recorded = get_counter(prev_label)
@@ -395,7 +397,7 @@ def record_sentiment(label, timestamp, value):
         set_counter(prev_label, current_time)
     else:
         if current_time > int(last_recorded) + 10:
-            record_sentiment_volume(label, timestamp, value)
+            record_sentiment_volume(label, timestamp, sentiment_value)
             set_counter(prev_label, current_time)
 
 def record_retweet_frequency(text, timestamp):
