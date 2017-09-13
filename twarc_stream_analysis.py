@@ -49,7 +49,7 @@ def init_params():
     conf["params"]["data_handling"] = "purge"
     conf["params"]["purge_interval"] = 300
     conf["params"]["retweet_spike_window"] = 120
-    conf["params"]["retweet_spike_minimum"] = 100
+    conf["params"]["retweet_spike_minimum"] = 200
     conf["params"]["retweet_spike_per_second_minimum"] = 1
     conf["params"]["time_to_live"] = 8 * 60 * 60
     conf["params"]["max_to_output"] = 250
@@ -484,17 +484,23 @@ def process_retweet_frequency():
             for text, count in data["retweet_frequency"]["retweet_counter"].iteritems():
                 previous_seen = data["retweet_frequency"]["previous_seen_retweet"][text]
                 first_seen = data["retweet_frequency"]["first_seen_retweet"][text]
-                time_since_last_seen = timestamp - previous_seen
-                time_since_first_seen = timestamp - first_seen
-                total_time_seen = previous_seen - first_seen
+                time_since_last_seen = 0
+                if previous_seen > 0:
+                    time_since_last_seen = timestamp - previous_seen
+                total_time_seen = 0
+                if first_seen > 0:
+                    total_time_seen = timestamp - first_seen
+                elif previous_seen > 0:
+                    total_time_seen = timestamp - previous_seen
                 tweets_per_second = 0
+                min_tps = conf["params"]["retweet_spike_per_second_minimum"] 
+                min_count = conf["params"]["retweet_spike_minimum"]
                 if total_time_seen > 0:
                     tweets_per_second = float(float(count)/float(total_time_seen))
-                if time_since_last_seen >= conf["params"]["retweet_spike_window"] and count <= conf["params"]["retweet_spike_minimum"]:
+                if time_since_last_seen >= conf["params"]["retweet_spike_window"]:
                         delete_list.append(text)
                         continue
-                if count > conf["params"]["retweet_spike_minimum"]:
-                    if tweets_per_second >= conf["params"]["retweet_spike_per_second_minimum"]:
+                if tweets_per_second >= min_tps and count >= min_count:
                         start = data["retweet_frequency"]["first_seen_retweet"][text]
                         end = data["retweet_frequency"]["previous_seen_retweet"][text]
                         count = data["retweet_frequency"]["retweet_counter"][text]
