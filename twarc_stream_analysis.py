@@ -48,7 +48,7 @@ def init_params():
     conf["params"]["min_tweets_for_suspicious"] = 10
     conf["params"]["data_handling"] = "purge"
     conf["params"]["purge_interval"] = 300
-    conf["params"]["retweet_spike_window"] = 10 * 60
+    conf["params"]["retweet_spike_window"] = 120
     conf["params"]["retweet_spike_minimum"] = 100
     conf["params"]["retweet_spike_per_second_minimum"] = 1
     conf["params"]["time_to_live"] = 8 * 60 * 60
