@@ -2620,7 +2620,7 @@ def process_tweet(status):
             info["suspiciousness_score"] += 300
             info["suspiciousness_reasons"] += "[non-legit Twitter client]"
 
-    if "real" in info["name"]:
+    if "real" in info["name"].lower():
             info["suspiciousness_score"] += 300
             info["suspiciousness_reasons"] += "[real in username]"
 
