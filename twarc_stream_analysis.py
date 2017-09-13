@@ -50,6 +50,7 @@ def init_params():
     conf["params"]["purge_interval"] = 300
     conf["params"]["retweet_spike_window"] = 10 * 60
     conf["params"]["retweet_spike_minimum"] = 100
+    conf["params"]["retweet_spike_per_second_minimum"] = 1
     conf["params"]["time_to_live"] = 8 * 60 * 60
     conf["params"]["max_to_output"] = 250
     if test is True:
@@ -451,7 +452,14 @@ def dump_retweet_spikes():
             handle.write(u"Tweet:\t" + unicode(text) + u"\n")
             handle.write(u"Start time:\t" + unicode(unix_time_to_readable(stuff["first_seen"])) + u"\n")
             handle.write(u"End time:\t" + unicode(unix_time_to_readable(stuff["last_seen"])) + u"\n")
-            handle.write(u"Count:\t" + unicode(stuff["count"]) + u"\n\n")
+            handle.write(u"Count:\t" + unicode(stuff["count"]) + u"\n")
+            duration = stuff["last_seen"] - stuff["first_seen"]
+            handle.write(u"Duration:\t" + unicode(duration) + u" seconds.\n")
+            if duration > 0:
+                tweets_per_second = float(stuff["count"]/float(duration))
+                handle.write(u"Tweets per second:\t" + "%.2f" % tweets_per_second + "\n")
+            handle.write(u"\n")
+
         handle.close()
         set_counter("retweet_spikes", spike_count)
 
@@ -468,14 +476,18 @@ def process_retweet_frequency():
                 time_since_last_seen = timestamp - previous_seen
                 time_since_first_seen = timestamp - first_seen
                 total_time_seen = time_since_last_seen - time_since_first_seen
+                tweets_per_second = 0
+                if total_time_seen > 0:
+                    tweets_per_second = float(float(count)/float(total_time_seen))
                 if time_since_last_seen >= conf["params"]["retweet_spike_window"] and count <= conf["params"]["retweet_spike_minimum"]:
                         delete_list.append(text)
                         continue
                 if count > conf["params"]["retweet_spike_minimum"]:
-                    start = data["retweet_frequency"]["first_seen_retweet"][text]
-                    end = data["retweet_frequency"]["previous_seen_retweet"][text]
-                    count = data["retweet_frequency"]["retweet_counter"][text]
-                    set_retweet_spike_data(text, start, end, count)
+                    if tweets_per_second >= conf["params"]["retweet_spike_per_second_minimum"]:
+                        start = data["retweet_frequency"]["first_seen_retweet"][text]
+                        end = data["retweet_frequency"]["previous_seen_retweet"][text]
+                        count = data["retweet_frequency"]["retweet_counter"][text]
+                        set_retweet_spike_data(text, start, end, count)
     if len(delete_list) > 0:
         delete_retweet_frequency(delete_list)
 
@@ -2537,7 +2549,7 @@ def process_tweet(status):
 
     if "source" in info:
         if is_source_legit(info["source"]) is False:
-            record_user = True
+            info["suspiciousness_score"] += 300
             info["suspiciousness_reasons"] += "[non-legit Twitter client]"
 
     if info["suspiciousness_score"] > suspiciousness_threshold:
