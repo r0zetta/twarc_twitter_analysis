@@ -1472,6 +1472,8 @@ def dump_pie_chart(dirname, filename, title, chart_data):
 
 def dump_line_chart(dirname, filename, title, x_labels, chart_data):
     debug_print(sys._getframe().f_code.co_name)
+    if len(x_labels) < 5:
+        return
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     filepath = dirname + filename
