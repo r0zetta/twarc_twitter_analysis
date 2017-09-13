@@ -381,13 +381,22 @@ def get_from_list_data(variable, category, name):
 # Custom storage and wrappers
 #############################
 
-def record_sentiment(label, value):
+def record_sentiment(label, timestamp, value):
     debug_print(sys._getframe().f_code.co_name)
     if exists_counter("sentiment_" + label):
         old_val = get_counter("sentiment_" + label)
         set_counter("sentiment_" + label, old_val + value)
     else:
         set_counter("sentiment_" + label, value)
+    current_time = int(time.time())
+    prev_label = "previous_sentiment_" + label
+    last_recorded = get_counter(prev_label)
+    if last_recorded is None:
+        set_counter(prev_label, current_time)
+    else:
+        if current_time > int(last_recorded) + 10:
+            record_sentiment_volume(label, timestamp, value)
+            set_counter(prev_label, current_time)
 
 def record_retweet_frequency(text, timestamp):
     debug_print(sys._getframe().f_code.co_name)
@@ -506,35 +515,60 @@ def get_highly_retweeted():
         ret = data["highly_retweeted"]
     return ret
 
-def record_tweet_volume(label, timestamp, value):
+
+def record_volume_data(category, label, timestamp, value):
     debug_print(sys._getframe().f_code.co_name)
     global data
     entry = {}
-    if "tweet_volumes" not in data:
-        data["tweet_volumes"] = {}
-    if label not in data["tweet_volumes"]:
-        data["tweet_volumes"][label] = []
+    if category not in data:
+        data[category] = {}
+    if label not in data[category]:
+        data[category][label] = []
     entry[timestamp] = value
-    data["tweet_volumes"][label].append(entry)
+    data[category][label].append(entry)
 
-def get_tweet_volumes(label):
+def get_volume_data(category, label):
     debug_print(sys._getframe().f_code.co_name)
     global data
     ret = {}
-    if "tweet_volumes" in data:
-        if label in data["tweet_volumes"]:
-            ret = data["tweet_volumes"][label]
+    if category in data:
+        if label in data[category]:
+            ret = data[category][label]
     return ret
 
-def get_tweet_volume_labels():
+def get_volume_labels(category):
     debug_print(sys._getframe().f_code.co_name)
     global data
     ret = []
-    if "tweet_volumes" in data:
-        for label, stuff in data["tweet_volumes"].iteritems():
+    if category in data:
+        for label, stuff in data[category].iteritems():
             if label not in ret:
                 ret.append(label)
     return ret
+
+def record_sentiment_volume(label, timestamp, value):
+    debug_print(sys._getframe().f_code.co_name)
+    record_volume_data("sentiment_volumes", label, timestamp, value)
+
+def get_sentiment_volumes(label):
+    debug_print(sys._getframe().f_code.co_name)
+    return get_volume_data("sentiment_volumes", label)
+
+def get_sentiment_volume_labels():
+    debug_print(sys._getframe().f_code.co_name)
+    return get_volume_labels("sentiment_volumes")
+
+def record_tweet_volume(label, timestamp, value):
+    debug_print(sys._getframe().f_code.co_name)
+    record_volume_data("tweet_volumes", label, timestamp, value)
+
+def get_tweet_volumes(label):
+    debug_print(sys._getframe().f_code.co_name)
+    return get_volume_data("tweet_volumes", label)
+
+def get_tweet_volume_labels():
+    debug_print(sys._getframe().f_code.co_name)
+    return get_volume_labels("tweet_volumes")
 
 def add_userinfo(category, name, user_data):
     debug_print(sys._getframe().f_code.co_name)
@@ -1414,18 +1448,18 @@ def write_timeline(filename, date, name, action, item, twt_id):
 # Graph generation routines
 ###########################
 
-def dump_pie_chart(dirname, filename, title, data):
+def dump_pie_chart(dirname, filename, title, chart_data):
     debug_print(sys._getframe().f_code.co_name)
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     filepath = dirname + filename
     total = 0
-    for n, c in data.iteritems():
+    for n, c in chart_data.iteritems():
         total += c
     pie_chart = pygal.Pie(truncate_legend=-1)
     pie_chart.title = title
     output_count = 0
-    for n, c in sorted(data.iteritems(), key=lambda x:x[1], reverse = True):
+    for n, c in sorted(chart_data.iteritems(), key=lambda x:x[1], reverse = True):
         percent = float(float(c)/float(total))*100.00
         label = n + " (" + "%.2f" % percent + "%)"
         pie_chart.add(label, c)
@@ -1433,6 +1467,37 @@ def dump_pie_chart(dirname, filename, title, data):
         if output_count > 15:
             break
     pie_chart.render_to_file(filepath)
+
+def dump_line_chart(dirname, filename, title, x_labels, chart_data):
+    debug_print(sys._getframe().f_code.co_name)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    filepath = dirname + filename
+    chart = pygal.Line(show_y_guides=True, show_dots=False, x_labels_major_count=5, show_minor_x_labels=False, show_minor_y_labels=False, x_label_rotation=20)
+    chart.title = title
+    chart.x_labels = x_labels
+    for name, stuff in chart_data.iteritems():
+        chart.add(name, stuff)
+    chart.render_to_file(filepath)
+
+def dump_sentiment_volume_graphs():
+    debug_print(sys._getframe().f_code.co_name)
+    labels = get_sentiment_volume_labels()
+    for l in labels:
+        volume_data = get_sentiment_volumes(l)
+        dates = []
+        volumes = []
+        for items in volume_data:
+            date = items.keys()
+            volume = items.values()
+            dates.append(date[0])
+            volumes.append(volume[0])
+        chart_data = {}
+        chart_data["sentiment"] = volumes
+        dirname = "data/sentiment/"
+        filename = "sentiment_" + l + ".svg"
+        title = "Sentiment (" + l + ")"
+        dump_line_chart(dirname, filename, title, dates, chart_data)
 
 def dump_tweet_volume_graphs():
     debug_print(sys._getframe().f_code.co_name)
@@ -1446,14 +1511,12 @@ def dump_tweet_volume_graphs():
             volume = items.values()
             dates.append(date[0])
             volumes.append(volume[0])
-        num_points = len(dates)
-        point_every = num_points/5
-        chart = pygal.Line(show_y_guides=True, show_dots=False, x_labels_major_every=point_every, show_minor_x_labels=False, show_minor_y_labels=False, x_label_rotation=20)
-        chart.title = "Tweet Volumes (" + l + ")"
-        chart.x_labels = dates
-        chart.add("tweets/second", volumes)
-        filename = "data/_tweet_volumes_" + l + ".svg"
-        chart.render_to_file(filename)
+        chart_data = {}
+        chart_data["tweets/sec"] = volumes
+        dirname = "data/"
+        filename = "_tweet_volumes_" + l + ".svg"
+        title = "Tweet Volumes (" + l + ")"
+        dump_line_chart(dirname, filename, title, dates, chart_data)
 
 def dump_languages_graph():
     debug_print(sys._getframe().f_code.co_name)
@@ -2150,6 +2213,7 @@ def dump_data():
     dump_targets_graph()
     dump_keywords_graph()
     dump_tweet_volume_graphs()
+    dump_sentiment_volume_graphs()
     process_retweet_frequency()
     dump_retweet_spikes()
 
@@ -2305,7 +2369,7 @@ def process_tweet(status):
                         increment_heatmap("target_" + ta, tweet_time_object)
                         increment_per_hour("targets", info["datestring"], ta)
                         if "sentiment" in status:
-                            record_sentiment(t, status["sentiment"])
+                            record_sentiment(t, info["tweet_time_readable"], status["sentiment"])
                 if add_data("metadata", label, t) is True:
                     increment_counter("tweet_words_seen")
         pos_words = get_positive_words(tokens)
@@ -2358,7 +2422,7 @@ def process_tweet(status):
                             increment_per_hour(label + "_tweets", info["datestring"], info["text"])
                             increment_counter(label + "_tweets")
                             if "sentiment" in status:
-                                record_sentiment(h, status["sentiment"])
+                                record_sentiment(h, info["tweet_time_readable"], status["sentiment"])
             pos_tags = get_positive_hashtags(info["hashtags"])
             info["positive_hashtags"] = len(pos_tags)
             if len(pos_tags) > 0:
@@ -2448,7 +2512,7 @@ def process_tweet(status):
                 add_timeline_data(info["tweet_time_readable"], info["name"], "used monitored keyword:", k, info["tweet_id"])
                 add_data("metadata", "keyword_tweets", info["text"])
                 if "sentiment" in status:
-                    record_sentiment(k, status["sentiment"])
+                    record_sentiment(k, info["tweet_time_readable"], status["sentiment"])
                 for h in info["hashtags"]:
                     increment_per_hour(label + "_hashtags", info["datestring"], h)
 
@@ -2551,6 +2615,10 @@ def process_tweet(status):
         if is_source_legit(info["source"]) is False:
             info["suspiciousness_score"] += 300
             info["suspiciousness_reasons"] += "[non-legit Twitter client]"
+
+    if "real" in info["name"]:
+            info["suspiciousness_score"] += 300
+            info["suspiciousness_reasons"] += "[real in username]"
 
     if info["suspiciousness_score"] > suspiciousness_threshold:
         record_user = True
