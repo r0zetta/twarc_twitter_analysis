@@ -2046,16 +2046,8 @@ def dump_dicts(raw_data, data_type, category, label):
         sys.exit(0)
 
     handle = io.open(filename, 'w', encoding='utf-8')
-    c = 0
-    w = 0
-    max_entries = 200
     for tag, count in sorted(raw_data.items(), key=lambda x:x[1], reverse=True):
-        if c > max_entries:
-            break
-        if count > w:
-            w = count
         handle.write(unicode(count) + "\t" + unicode(tag) +  u"\n")
-        c += 1
     handle.close()
 
 def dump_associations():
