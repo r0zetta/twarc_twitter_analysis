@@ -2857,7 +2857,7 @@ def dump_event():
             old_average = get_counter("average_tweets_per_second")
             new_average = float((float(tps) + float(old_average)) / 2)
             set_counter("average_tweets_per_second", new_average)
-            if tps > old_average * 1.2:
+            if tps > old_average * 1.4:
                 record_volume_spike(old_average, tps)
         else:
             set_counter("average_tweets_per_second", tps)
@@ -2868,9 +2868,13 @@ def dump_event():
 def record_volume_spike(av, tps):
     filename = "data/custom/tweet_spikes.txt"
     current_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
+    percent_change = 0
+    if av > 0:
+        percent_change = ((tps-av)/av)*100
     handle = io.open(filename, "a", encoding="utf-8")
     handle.write(u"Tweet spike at:\t" + unicode(current_time_str) + u"\n")
     handle.write(u"average tps:\t" + unicode("%.2f"%av) + u"\tcurrent tps:\t" + unicode("%.2f"%tps) + u"\n")
+    handle.write(u"Percent change:\t" + unicode("%.2f"%percent_change) + u"\n")
     handle.write(u"\n")
     handle.close()
 
