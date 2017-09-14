@@ -176,7 +176,7 @@ def dump_bar_chart(dirname, filename, title, x_labels, chart_data):
 def dump_chronology():
     global data
     types = ["per_hour", "per_day", "per_week", "per_month"]
-    labels = ["own_tweets", "retweets", "all_tweets"]
+    labels = ["own_tweets", "retweets", "all_tweets", "replies"]
     dirname = output_dir
     for t in types:
         for l in labels:
@@ -192,7 +192,7 @@ def dump_chronology():
                     x_axis_labels.append(name)
                     plot_data[l].append(count)
                     seen += 1
-                if seen > 50:
+                if seen > 100:
                     dump_line_chart(dirname, filename, title, x_axis_labels, plot_data)
                 else:
                     dump_bar_chart(dirname, filename, title, x_axis_labels, plot_data)
@@ -292,12 +292,14 @@ if __name__ == '__main__':
         entry = date_string + " | " + status.text + "\n"
         tweet_texts.append(entry)
 
+        replied = False
         replied_user = ""
         if hasattr(status, 'in_reply_to_screen_name'):
             if status.in_reply_to_screen_name is not None:
                 replied_user = status.in_reply_to_screen_name
                 increment_counter("replied_to", status.in_reply_to_screen_name)
                 replies += 1
+                replied = True
 
         lang = ""
         if hasattr(status, 'lang'):
@@ -327,12 +329,16 @@ if __name__ == '__main__':
                             increment_counter("quoted", quoted_user)
                             quote_tweets += 1
 
+        if replied is True:
+            record_chronology("replies", tweet_time)
+
         if retweeted is True:
             retweets += 1
             record_chronology("retweets", tweet_time)
         else:
             own_tweets += 1
             record_chronology("own_tweets", tweet_time)
+
         record_chronology("all_tweets", tweet_time)
 
 
