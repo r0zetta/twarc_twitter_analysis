@@ -2853,9 +2853,26 @@ def dump_event():
         current_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
         output += "Current time is: " + current_time_str + "\n\n"
         record_tweet_volume("all_tweets", current_time_str, tps)
+        if exists_counter("average_tweets_per_second"):
+            old_average = get_counter("average_tweets_per_second")
+            new_average = float((float(tps) + float(old_average)) / 2)
+            set_counter("average_tweets_per_second", new_average)
+            if tps > old_average * 1.2:
+                record_volume_spike(old_average, tps)
+        else:
+            set_counter("average_tweets_per_second", tps)
         print output
         volume_file_handle.write(current_time_str + "\t" + str("%.2f" % tps) + "\n")
         return
+
+def record_volume_spike(av, tps):
+    filename = "data/custom/tweet_spikes.txt"
+    current_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
+    handle = io.open(filename, "a", encoding="utf-8")
+    handle.write(u"Tweet spike at:\t" + unicode(current_time_str) + u"\n")
+    handle.write(u"average tps:\t" + unicode("%.2f"%av) + u"\tcurrent tps:\t" + unicode("%.2f"%tps) + u"\n")
+    handle.write(u"\n")
+    handle.close()
 
 ############################
 # Periodically reload config
