@@ -7,6 +7,7 @@ from tweepy import Cursor
 from datetime import datetime, date, time, timedelta
 from authentication_keys import get_account_credentials
 import numpy as np
+import pygal
 import os.path
 import random
 import json
@@ -85,6 +86,18 @@ def time_string_to_object(time_string):
 def time_object_to_string(time_object):
     return datetime.strftime(time_object, '%Y-%m-%d %H:%M:%S')
 
+def time_object_to_month(time_object):
+    return datetime.strftime(time_object, '%Y-%m')
+
+def time_object_to_week(time_object):
+    return datetime.strftime(time_object, '%Y-%U')
+
+def time_object_to_day(time_object):
+    return datetime.strftime(time_object, '%Y-%m-%d')
+
+def time_object_to_hour(time_object):
+    return datetime.strftime(time_object, '%Y-%m-%d-%H')
+
 def increment_counter(label, name):
     global data
     if label not in data:
@@ -113,6 +126,93 @@ def output_top_data():
             if output_count > 10:
                 break
     return output_string
+
+def dump_pie_chart(dirname, filename, title, chart_data):
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    filepath = dirname + filename
+    total = 0
+    for n, c in chart_data.iteritems():
+        total += c
+    pie_chart = pygal.Pie(truncate_legend=-1)
+    pie_chart.title = title
+    output_count = 0
+    for n, c in sorted(chart_data.iteritems(), key=lambda x:x[1], reverse = True):
+        percent = float(float(c)/float(total))*100.00
+        label = n + " (" + "%.2f" % percent + "%)"
+        pie_chart.add(label, c)
+        output_count += 1
+        if output_count > 15:
+            break
+    pie_chart.render_to_file(filepath)
+
+def dump_line_chart(dirname, filename, title, x_labels, chart_data):
+    if len(x_labels) < 5:
+        return
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    filepath = dirname + filename
+    chart = pygal.Line(show_y_guides=True, show_dots=False, x_labels_major_count=5, show_minor_x_labels=False, show_minor_y_labels=False, x_label_rotation=20)
+    chart.title = title
+    chart.x_labels = x_labels
+    for name, stuff in chart_data.iteritems():
+        chart.add(name, stuff)
+    chart.render_to_file(filepath)
+
+def dump_bar_chart(dirname, filename, title, x_labels, chart_data):
+    if len(x_labels) < 5:
+        return
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    filepath = dirname + filename
+    chart = pygal.Bar(show_y_guides=True, x_labels_major_count=5, show_minor_x_labels=False, show_minor_y_labels=False, x_label_rotation=20)
+    chart.title = title
+    chart.x_labels = x_labels
+    for name, stuff in chart_data.iteritems():
+        chart.add(name, stuff)
+    chart.render_to_file(filepath)
+
+
+def dump_chronology():
+    global data
+    types = ["per_hour", "per_day", "per_week", "per_month"]
+    labels = ["own_tweets", "retweets", "all_tweets"]
+    dirname = output_dir
+    for t in types:
+        for l in labels:
+            x_axis_labels = []
+            plot_data = {}
+            title = t + "_" + l
+            y_axis_label = "tweets/minute"
+            filename = title + ".svg"
+            if title in data:
+                plot_data[l] = []
+                seen = 0
+                for name, count in sorted(data[title].items(), key=lambda x:x[0], reverse=False):
+                    x_axis_labels.append(name)
+                    plot_data[l].append(count)
+                    seen += 1
+                if seen > 50:
+                    dump_line_chart(dirname, filename, title, x_axis_labels, plot_data)
+                else:
+                    dump_bar_chart(dirname, filename, title, x_axis_labels, plot_data)
+
+def record_chronology(label, tweet_time):
+    global data
+    timestamps = {}
+    timestamps["per_hour"] = time_object_to_hour(tweet_time)
+    timestamps["per_day"] = time_object_to_day(tweet_time)
+    timestamps["per_week"] = time_object_to_week(tweet_time)
+    timestamps["per_month"] = time_object_to_month(tweet_time)
+    types = ["per_hour", "per_day", "per_week", "per_month"]
+    for t in types:
+        l = t + "_" + label
+        if l not in data:
+            data[l] = {}
+        if timestamps[t] not in data[l]:
+            data[l][timestamps[t]] = 1
+        else:
+            data[l][timestamps[t]] += 1
 
 if __name__ == '__main__':
     acct_name, consumer_key, consumer_secret, access_token, access_token_secret = get_account_credentials()
@@ -229,8 +329,12 @@ if __name__ == '__main__':
 
         if retweeted is True:
             retweets += 1
+            record_chronology("retweets", tweet_time)
         else:
             own_tweets += 1
+            record_chronology("own_tweets", tweet_time)
+        record_chronology("all_tweets", tweet_time)
+
 
         if hasattr(status, 'entities'):
             entities = status.entities
@@ -341,4 +445,5 @@ if __name__ == '__main__':
     handle.write(data_string)
     handle.close()
 
+    dump_chronology()
 
