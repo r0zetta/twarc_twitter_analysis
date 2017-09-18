@@ -400,7 +400,7 @@ def record_sentiment(label, timestamp, value):
             record_sentiment_volume(label, timestamp, sentiment_value)
             set_counter(prev_label, current_time)
 
-def record_retweet_frequency(text, timestamp):
+def record_retweet_frequency(text, timestamp, id_str, name):
     debug_print(sys._getframe().f_code.co_name)
     global data
     if "retweet_frequency" not in data:
@@ -419,6 +419,17 @@ def record_retweet_frequency(text, timestamp):
         increment_counter("tracked_retweets")
     else:
         data["retweet_frequency"]["retweet_counter"][text] += 1
+    if "retweet_metadata" not in data["retweet_frequency"]:
+        data["retweet_frequency"]["retweet_metadata"] = {}
+    if text not in data["retweet_frequency"]["retweet_metadata"]:
+        data["retweet_frequency"]["retweet_metadata"][text] = {}
+    data["retweet_frequency"]["retweet_metadata"][text]["id_str"] = id_str
+    if "names" not in data["retweet_frequency"]["retweet_metadata"][text]:
+        data["retweet_frequency"]["retweet_metadata"][text]["names"] = []
+    data["retweet_frequency"]["retweet_metadata"][text]["names"].append(name)
+
+
+
 
 def delete_retweet_frequency(delete_list):
     debug_print(sys._getframe().f_code.co_name)
@@ -430,8 +441,9 @@ def delete_retweet_frequency(delete_list):
         del data["retweet_frequency"]["first_seen_retweet"][text]
         del data["retweet_frequency"]["previous_seen_retweet"][text]
         del data["retweet_frequency"]["retweet_counter"][text]
+        del data["retweet_frequency"]["retweet_metadata"][text]
 
-def set_retweet_spike_data(text, first_seen, last_seen, count):
+def set_retweet_spike_data(text, id_str, first_seen, last_seen, count, names):
     debug_print(sys._getframe().f_code.co_name)
     global data
     new_count = count
@@ -448,6 +460,8 @@ def set_retweet_spike_data(text, first_seen, last_seen, count):
     spike_record["first_seen"] = real_first_seen
     spike_record["last_seen"] = last_seen
     spike_record["count"] = new_count
+    spike_record["id_str"] = id_str
+    spike_record["names"] = names
     data["retweet_spikes"][text] = spike_record
 
 def dump_retweet_spikes():
@@ -461,6 +475,7 @@ def dump_retweet_spikes():
             spike_count += 1
             text = text.replace('\n', ' ')
             handle.write(u"Tweet:\t" + unicode(text) + u"\n")
+            handle.write(u"Id:\t" + unicode(stuff["id_str"]) + u"\n")
             handle.write(u"Start time:\t" + unicode(unix_time_to_readable(stuff["first_seen"])) + u"\n")
             handle.write(u"End time:\t" + unicode(unix_time_to_readable(stuff["last_seen"])) + u"\n")
             handle.write(u"Count:\t" + unicode(stuff["count"]) + u"\n")
@@ -469,6 +484,9 @@ def dump_retweet_spikes():
             if duration > 0:
                 tweets_per_second = float(stuff["count"]/float(duration))
                 handle.write(u"Tweets per second:\t" + "%.2f" % tweets_per_second + "\n")
+            namelist = u",".join(map(stuff["names"]))
+            handle.write("Users:\n")
+            handle.write(namelist + "\n")
             handle.write(u"\n")
 
         handle.close()
@@ -504,7 +522,10 @@ def process_retweet_frequency():
                         start = data["retweet_frequency"]["first_seen_retweet"][text]
                         end = data["retweet_frequency"]["previous_seen_retweet"][text]
                         count = data["retweet_frequency"]["retweet_counter"][text]
-                        set_retweet_spike_data(text, start, end, count)
+                        metadata = data["retweet_frequency"]["retweet_metadata"][text]
+                        id_str = metadata["id_str"]
+                        names = metadata["names"]
+                        set_retweet_spike_data(text, id_str, start, end, count, names)
     if len(delete_list) > 0:
         delete_retweet_frequency(delete_list)
 
@@ -1903,11 +1924,25 @@ def cache_item(category, name):
 ########################
 def dump_counters():
     debug_print(sys._getframe().f_code.co_name)
-    handle = io.open("data/_counters.txt", "w", encoding='utf-8')
     counter_dump = get_all_counters()
+    val_output = ""
+    date_output = ""
     if counter_dump is not None:
         for n, c in sorted(counter_dump.iteritems()):
-            handle.write(unicode(n) + u" = " + unicode(c) + u"\n")
+            val = None
+            if type(c) is float:
+                val = "%.2f"%c
+                val_output += unicode(val) + u"\t" + unicode(n) + u"\n"
+            elif len(str(c)) > 9:
+                val = unix_time_to_readable(int(c))
+                date_output += unicode(val) + u"\t" + unicode(n) + u"\n"
+            else:
+                val = c
+                val_output += unicode(val) + u"\t" + unicode(n) + u"\n"
+    handle = io.open("data/_counters.txt", "w", encoding='utf-8')
+    handle.write(unicode(val_output))
+    handle.write(u"\n")
+    handle.write(unicode(date_output))
     handle.close
 
 def dump_heatmap(name):
@@ -2337,7 +2372,10 @@ def process_tweet(status):
         if info["retweeted_name"] is not None:
             add_data("users", "retweeters", info["name"])
             if "retweet_text" in status:
-                record_retweet_frequency(status["retweet_text"], info["tweet_time_unix"])
+                retweet_id = ""
+                if "retweet_id" in status:
+                    retweet_id = status["retweet_id_str"]
+                record_retweet_frequency(status["retweet_text"], info["tweet_time_unix"], retweet_id, info["name"])
             increment_heatmap("retweets", tweet_time_object)
             increment_per_hour("retweeters", info["datestring"], info["name"])
             add_graphing_data("retweets", info["name"], info["retweeted_name"])
@@ -2703,6 +2741,8 @@ def capture_status_items(status):
                     captured_status["retweet_count"] = orig_tweet["retweet_count"]
                 if "full_text" in orig_tweet:
                     captured_status["retweet_text"] = orig_tweet["full_text"]
+                if "id_str" in orig_tweet:
+                    captured_status["retweet_id_str"] = orig_tweet["id_str"]
                 elif "text" in orig_tweet:
                     captured_status["retweet_text"] = orig_tweet["text"]
                 if "screen_name" in orig_tweet["user"]:
@@ -2873,8 +2913,9 @@ def record_volume_spike(av, tps):
         percent_change = ((tps-av)/av)*100
     handle = io.open(filename, "a", encoding="utf-8")
     handle.write(u"Tweet spike at:\t" + unicode(current_time_str) + u"\n")
-    handle.write(u"average tps:\t" + unicode("%.2f"%av) + u"\tcurrent tps:\t" + unicode("%.2f"%tps) + u"\n")
-    handle.write(u"Percent change:\t" + unicode("%.2f"%percent_change) + u"\n")
+    handle.write(u"Average tweets per second:\t" + unicode("%.2f"%av) + u"\n")
+    handle.write(u"Recorded tweets per second:\t" + unicode("%.2f"%tps) + u"\n")
+    handle.write(u"Percent change:\t" + unicode("%.2f"%percent_change) + u"%\n")
     handle.write(u"\n")
     handle.close()
 
