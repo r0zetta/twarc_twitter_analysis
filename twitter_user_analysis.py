@@ -236,6 +236,7 @@ if __name__ == '__main__':
     heatmap = []
     interarrivals = {}
     tweet_texts = []
+    tweet_info = []
     sources = {}
 
     heatmap = [[0 for j in range(24)] for i in range(7)]
@@ -290,7 +291,11 @@ if __name__ == '__main__':
         text = status.text
         text = text.replace('\n', ' ').replace('\r', '')
         entry = date_string + " | " + status.text + "\n"
+        details = {}
+        details["text"] = text
+        details["source"] = status.source
         tweet_texts.append(entry)
+        tweet_info.append(details)
 
         replied = False
         replied_user = ""
@@ -406,6 +411,15 @@ if __name__ == '__main__':
     handle = open(filename, 'w')
     for text in tweet_texts:
         handle.write(text.encode('utf-8'))
+    handle.close()
+
+    filename = output_dir + target.encode('utf-8') + "-details.txt"
+    print "Writing file: " + filename
+    handle = io.open(filename, 'w', encoding='utf-8')
+    for entry in tweet_info:
+        t = entry["text"]
+        s = entry["source"]
+        handle.write(s.encode('utf-8') + ":\t" + t.encode('utf-8') + "\n")
     handle.close()
 
     filename = output_dir + target.encode('utf-8') + "-heatmap.csv"
