@@ -2687,10 +2687,9 @@ def process_tweet(status):
 
 # Look for high percentage of replies (often used by porn bots, or to hide timeline)
     if info["reply_percent"] > min_percentage:
-        info["suspiciousness_score"] += info["reply_percent"]
         if info["tweets_seen"] > min_tweets:
-            record_user = True
-            info["suspiciousness_reasons"] += "[high percentage of replies]"
+            info["suspiciousness_score"] += info["reply_percent"]
+            info["suspiciousness_reasons"] += "[high reply percent]"
 
 # Look for high retweet percentages
     if info["retweet_percent"] > min_percentage:
@@ -2755,11 +2754,6 @@ def process_tweet(status):
         debug_print("Recording suspiciousness for " + info["name"])
         add_userinfo("suspicious", info["name"], info)
         increment_counter("suspicious_users")
-    else:
-        if exists_userinfo("suspicious", info["name"]):
-            debug_print("Deleting suspiciousness for " + info["name"])
-            del_userinfo("suspicious", info["name"])
-            decrement_counter("suspicious_users")
 
     info["processing_end_time"] = int(time.time())
     processing_duration = info["processing_end_time"] - info["processing_start_time"]
