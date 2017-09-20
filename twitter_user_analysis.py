@@ -109,22 +109,26 @@ def increment_counter(label, name):
 def output_data():
     output_string = ""
     for label, stuff in sorted(data.iteritems()):
-        output_string += u"\n" + label.encode('utf-8') + u":\n\n"
-        for item, count in sorted(stuff.iteritems()):
-            output_string += unicode(count) + u": " + unicode(item) + u"\n"
+        m = re.search("^per_\w+$", label)
+        if m is None:
+            output_string += u"\n" + label.encode('utf-8') + u":\n\n"
+            for item, count in sorted(stuff.iteritems()):
+                output_string += unicode(count) + u": " + unicode(item) + u"\n"
     return output_string
 
 def output_top_data():
     output_string = ""
     for label, stuff in sorted(data.iteritems()):
-        output_string += u"\n" + label.encode('utf-8') + u":\n\n"
-        output_count = 0
-        for item, count in sorted(stuff.iteritems(), key=lambda x:x[1], reverse=True):
-            if count > 1:
-                output_string += unicode(count) + u": " + unicode(item) + u"\n"
-            output_count += 1
-            if output_count > 10:
-                break
+        m = re.search("^per_\w+$", label)
+        if m is None:
+            output_string += u"\n" + label.encode('utf-8') + u":\n\n"
+            output_count = 0
+            for item, count in sorted(stuff.iteritems(), key=lambda x:x[1], reverse=True):
+                if count > 1:
+                    output_string += unicode(count) + u": " + unicode(item) + u"\n"
+                output_count += 1
+                if output_count > 10:
+                    break
     return output_string
 
 def dump_pie_chart(dirname, filename, title, chart_data):
@@ -172,7 +176,6 @@ def dump_bar_chart(dirname, filename, title, x_labels, chart_data):
         chart.add(name, stuff)
     chart.render_to_file(filepath)
 
-
 def dump_chronology():
     global data
     types = ["per_hour", "per_day", "per_week", "per_month"]
@@ -214,6 +217,42 @@ def record_chronology(label, tweet_time):
         else:
             data[l][timestamps[t]] += 1
 
+def create_blocks(id_list):
+    id_count = 0
+    block_count = 0
+    id_blocks = {}
+    print "List had " + str(len(id_list)) + " items."
+    for twid in id_list:
+        if block_count in id_blocks:
+            id_blocks[block_count].append(twid)
+        else:
+            id_blocks[block_count] = []
+            id_blocks[block_count].append(twid)
+        id_count += 1
+        if id_count >= 99:
+            id_count = 0
+            block_count += 1
+    print "Found " + str(block_count) + " data blocks."
+    return id_blocks
+
+def query_blocks(id_blocks):
+    screen_names = []
+    block_count = len(id_blocks.items())
+    print "Found " + str(block_count) + " blocks."
+    for block, data in id_blocks.iteritems():
+        print "Iterating block:" + str(block) + "/" + str(block_count)
+        users_list = auth_api.lookup_users(user_ids=data)
+        for item in users_list:
+            screen_name = item.screen_name
+            if screen_name not in screen_names:
+                screen_names.append(screen_name)
+    return screen_names
+
+def get_screen_names(id_list):
+    id_blocks = create_blocks(id_list)
+    screen_names = query_blocks(id_blocks)
+    return screen_names
+
 if __name__ == '__main__':
     acct_name, consumer_key, consumer_secret, access_token, access_token_secret = get_account_credentials()
     auth = OAuthHandler(consumer_key, consumer_secret)
@@ -249,8 +288,9 @@ if __name__ == '__main__':
     tweets = item.statuses_count
     likes = item.favourites_count
     lists = item.listed_count
-    following = item.friends_count
-    followers = item.followers_count
+    following_count = item.friends_count
+    followers_count = item.followers_count
+    description = item.description
     account_created_date = item.created_at
     account_created_date_readable = time_object_to_string(account_created_date)
 
@@ -388,6 +428,19 @@ if __name__ == '__main__':
         sys.stdout.write("#")
         sys.stdout.flush()
 
+    print "Getting followers for " + target
+    followers = auth_api.followers_ids(target)
+    follower_names = get_screen_names(followers)
+
+    print "Getting followed for " + target
+    friends = auth_api.friends_ids(target)
+    friends_names = get_screen_names(friends)
+
+    reciprocal_names = []
+    for n in follower_names:
+        if n in friends_names:
+            if n not in reciprocal_names:
+                reciprocal_names.append(n)
     print
     print "All done. Processed " + str(tweet_count) + " tweets."
     print
@@ -395,6 +448,24 @@ if __name__ == '__main__':
     output_dir += target.encode('utf-8') + "/"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+
+    filename = output_dir + target.encode('utf-8') + "-followers.txt"
+    handle = open(filename, 'w')
+    for n in follower_names:
+        handle.write(n + "\n")
+    handle.close()
+
+    filename = output_dir + target.encode('utf-8') + "-following.txt"
+    handle = open(filename, 'w')
+    for n in friends_names:
+        handle.write(n + "\n")
+    handle.close()
+
+    filename = output_dir + target.encode('utf-8') + "-reciprocal.txt"
+    handle = open(filename, 'w')
+    for n in reciprocal_names:
+        handle.write(n + "\n")
+    handle.close()
 
     filename = output_dir + target.encode('utf-8') + "-interarrivals.txt"
     print "Writing file: " + filename
@@ -413,14 +484,14 @@ if __name__ == '__main__':
         handle.write(text.encode('utf-8'))
     handle.close()
 
-    filename = output_dir + target.encode('utf-8') + "-details.txt"
-    print "Writing file: " + filename
-    handle = io.open(filename, 'w', encoding='utf-8')
-    for entry in tweet_info:
-        t = entry["text"]
-        s = entry["source"]
-        handle.write(s.encode('utf-8') + ":\t" + t.encode('utf-8') + "\n")
-    handle.close()
+    #filename = output_dir + target.encode('utf-8') + "-details.txt"
+    #print "Writing file: " + filename
+    #handle = io.open(filename, 'w', encoding='utf-8')
+    #for entry in tweet_info:
+        #t = entry["text"]
+        #s = entry["source"]
+        #handle.write(s.encode('utf-8') + ":\t" + t.encode('utf-8') + "\n")
+    #handle.close()
 
     filename = output_dir + target.encode('utf-8') + "-heatmap.csv"
     print "Writing file: " + filename
@@ -444,9 +515,10 @@ if __name__ == '__main__':
     handle.write(u"Tweets: " + unicode(tweets) + u"\n")
     handle.write(u"Likes: " + unicode(likes) + u"\n")
     handle.write(u"Lists: " + unicode(lists) + u"\n")
-    handle.write(u"Following: " + unicode(following) + u"\n")
-    handle.write(u"Followers: " + unicode(followers) + u"\n")
+    handle.write(u"Following: " + unicode(following_count) + u"\n")
+    handle.write(u"Followers: " + unicode(followers_count) + u"\n")
     handle.write(u"Created: " + unicode(account_created_date_readable) + u"\n")
+    handle.write(u"Description: " + unicode(description) + u"\n")
     handle.write(u"Tweets per hour: " + unicode(tweets_per_hour) + u"\n")
     handle.write(u"Tweets per day: " + unicode(tweets_per_day) + u"\n")
     handle.write(u"Tweets analyzed: " + unicode(tweet_count) + u"\n")
