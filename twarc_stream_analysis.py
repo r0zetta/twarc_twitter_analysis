@@ -49,8 +49,9 @@ def init_params():
     conf["params"]["data_handling"] = "purge"
     conf["params"]["purge_interval"] = 300
     conf["params"]["retweet_spike_window"] = 120
-    conf["params"]["retweet_spike_minimum"] = 200
+    conf["params"]["retweet_spike_minimum"] = 100
     conf["params"]["retweet_spike_per_second_minimum"] = 1
+    conf["params"]["tweet_spike_minimum"] = 1.8
     conf["params"]["time_to_live"] = 8 * 60 * 60
     conf["params"]["max_to_output"] = 250
     if test is True:
@@ -484,9 +485,10 @@ def dump_retweet_spikes():
             if duration > 0:
                 tweets_per_second = float(stuff["count"]/float(duration))
                 handle.write(u"Tweets per second:\t" + "%.2f" % tweets_per_second + "\n")
-            namelist = u",".join(map(stuff["names"]))
-            handle.write("Users:\n")
-            handle.write(namelist + "\n")
+            if "names" in stuff:
+                namelist = u",".join(map(unicode, stuff["names"]))
+                handle.write(u"Users:\n")
+                handle.write(namelist + u"\n")
             handle.write(u"\n")
 
         handle.close()
@@ -1387,7 +1389,32 @@ def reload_settings():
     conf["settings"]["monitored_users"] = read_config("config/monitored_users.txt")
     conf["settings"]["url_keywords"] = read_config("config/url_keywords.txt")
     conf["settings"]["monitored_langs"] = read_config("config/languages.txt")
+    conf["settings"]["description_keywords"] = read_config("config/description_keywords.txt")
+    conf["settings"]["tweet_identifiers"] = read_config("config/tweet_identifiers.txt")
     conf["config"] = read_settings("config/settings.txt")
+
+def get_description_matches(description):
+    debug_print(sys._getframe().f_code.co_name)
+    desc = description.lower()
+    ret = []
+    if "settings" in conf:
+        if "description_keywords" in conf["settings"]:
+            for d in conf["settings"]["description_keywords"]:
+                if d in desc:
+                    ret.append(d)
+    return ret
+
+def get_tweet_identifier_matches(tweet_text):
+    debug_print(sys._getframe().f_code.co_name)
+    text = tweet_text.lower()
+    ret = []
+    if "settings" in conf:
+        if "tweet_identifiers" in conf["settings"]:
+            for t in conf["settings"]["tweet_identifiers"]:
+                if t in text:
+                    ret.append(t)
+    return ret
+
 
 ###############
 # Serialization
@@ -2396,6 +2423,7 @@ def process_tweet(status):
 # Tweet words, description words
     info["positive_words"] = 0
     info["negative_words"] = 0
+    info["tweet_identifier_matches"] = get_tweet_identifier_matches(info["text"])
     if conf["config"]["log_words"] is True:
         tokens = strip_stopwords(tokenize(info["text"]), info["lang"])
         if len(tokens) > 0:
@@ -2436,6 +2464,7 @@ def process_tweet(status):
                 for t in tokens:
                     if add_data("metadata", "description_words", t) is True:
                         increment_counter("description_words_seen")
+            info["description_matches"] = get_description_matches(status["description"])
 
 # Hashtags
     info["hashtags"] = []
@@ -2588,7 +2617,8 @@ def process_tweet(status):
         min_tweets = conf["params"]["min_tweets_for_suspicious"]
     min_tweets_per_day = 100
     stdev_multiplier = 10
-    min_percentage = 75
+    generic_multiplier = 100
+    min_percentage = 90
     min_follow_ratio = 1.2
     follow_ratio_multiplier = 5
     min_followers = 150
@@ -2604,76 +2634,115 @@ def process_tweet(status):
     info["suspiciousness_score"] = 0
     record_user = False
     info["suspiciousness_reasons"] = ""
+
+# Count suspicious description words
+    if "description_matches" in info:
+        if len(info["description_matches"]) > 1:
+            info["suspiciousness_score"] += len(info["description_matches"]) * generic_multiplier * 2
+            info["suspiciousness_reasons"] += "[suspicious description words]"
+
+# Look for accounts with no description
+    if "description" not in status:
+        info["suspiciousness_score"] += generic_multiplier
+        info["suspiciousness_reasons"] += "[no description]"
+
+# Count suspicious words in tweet text
+    if len(info["tweet_identifier_matches"]) > 1:
+        info["suspiciousness_score"] += len(info["tweet_identifier_matches"]) * generic_multiplier * 2
+        info["suspiciousness_reasons"] += "[suspicious words in tweets]"
+
+# Look for extremely heavy account activity
     if info["tweets_per_day"] > min_tweets_per_day:
         info["suspiciousness_score"] += info["tweets_per_day"] - min_tweets_per_day
+        info["suspiciousness_reasons"] += "[high activity]"
+
     if info["account_age_days"] > 0:
         if info["account_age_days"] < min_account_age_days:
             if info["tweets_per_day"] > min_tweets_per_day:
                 info["suspiciousness_score"] += (info["tweets_per_day"] - min_tweets_per_day) * (min_account_age_days - info["account_age_days"])
+                info["suspiciousness_reasons"] += "[high activity on new account]"
+
+# Look for high activity and low follower count
     if info["followers_count"] < min_followers:
         if info["tweets_per_day"] > min_tweets_per_day:
             info["suspiciousness_score"] += info["tweets_per_day"] - min_tweets_per_day
+            info["suspiciousness_reasons"] += "[high activity and low follower count]"
+
+# Look for bot-like tweet patterns
     if info["interarrival_stdev"] > min_stdev:
         info["suspiciousness_score"] += (info["interarrival_stdev"] * stdev_multiplier)
+        info["suspiciousness_reasons"] += "[interarrival pattern]"
         if info["tweets_seen"] > min_tweets:
             record_user = True
             info["suspiciousness_reasons"] += "[frequent tweets]"
     if info["reply_stdev"] > min_stdev:
         info["suspiciousness_score"] += (info["reply_stdev"] * stdev_multiplier)
+        info["suspiciousness_reasons"] += "[interarrival pattern]"
         if info["tweets_seen"] > min_tweets:
             record_user = True
             info["suspiciousness_reasons"] += "[frequent replies]"
     if info["retweet_stdev"] > min_stdev:
         info["suspiciousness_score"] += (info["retweet_stdev"] * stdev_multiplier)
+        info["suspiciousness_reasons"] += "[interarrival pattern]"
+
+# Look for high percentage of replies (often used by porn bots, or to hide timeline)
     if info["reply_percent"] > min_percentage:
         info["suspiciousness_score"] += info["reply_percent"]
         if info["tweets_seen"] > min_tweets:
             record_user = True
             info["suspiciousness_reasons"] += "[high percentage of replies]"
+
+# Look for high retweet percentages
     if info["retweet_percent"] > min_percentage:
         info["suspiciousness_score"] += info["retweet_percent"]
+        info["suspiciousness_reasons"] += "[high percentage of retweets]"
+
+# Look for an abundance of fake news posts
     if info["fake_news_percent"] > min_percentage:
         info["suspiciousness_score"] += info["fake_news_percent"]
         if info["tweets_seen"] > min_tweets:
             record_user = True
             info["suspiciousness_reasons"] += "[frequent fake news tweets]"
+
+# Look for high following, low followers ratios
     if info["followers_count"] > min_followers:
         if info["follower_ratio"] > min_follow_ratio:
             info["suspiciousness_score"] += (info["follower_ratio"] * follow_ratio_multiplier)
             if info["tweets_seen"] > min_tweets:
                 record_user = True
                 info["suspiciousness_reasons"] += "[follow ratio]"
+
+# Look for old accounts with zero followers
     if info["account_age_days"] > min_account_age_days:
         if info["followers_count"] == 0:
-            info["suspiciousness_score"] += 100
+            info["suspiciousness_score"] += generic_multiplier
 
-# XXX come up with a rule that removes consitutionb0t, etc.
     info["suspiciousness_score"] = int(info["suspiciousness_score"])
     debug_print("Suspiciousness: " + str(info["suspiciousness_score"]))
 
+# Look for non-standard source (twitter client)
     if "source" in info:
         if is_source_legit(info["source"]) is False:
             info["suspiciousness_score"] += 300
             info["suspiciousness_reasons"] += "[non-legit Twitter client]"
 
+# Look for patterns in username
     if "real" in info["name"].lower():
             info["suspiciousness_score"] += 300
             info["suspiciousness_reasons"] += "[real in username]"
 
     if info["suspiciousness_score"] > suspiciousness_threshold:
         record_user = True
-        info["suspiciousness_reasons"] += "[suspiciousness threshold]"
 
+# Look for users who's been seen a lot while analysis was running
     if info["tweets_seen"] > crazy_threshold:
         record_user = True
         info["suspiciousness_reasons"] += "[crazy threshold]"
 
-    if info["verified"] == "Yes":
-        record_user = False
-
     if info["suspiciousness_score"] < 1:
         record_user = False
 
+# Not suspicious, but log users with large numbers of interactions
     if info["two_way"] > 0:
         info["suspiciousness_reasons"] += "[non-zero two_way]"
 
@@ -2897,7 +2966,7 @@ def dump_event():
             old_average = get_counter("average_tweets_per_second")
             new_average = float((float(tps) + float(old_average)) / 2)
             set_counter("average_tweets_per_second", new_average)
-            if tps > old_average * 1.4:
+            if tps > old_average * conf["params"]["tweet_spike_minimum"]:
                 record_volume_spike(old_average, tps)
         else:
             set_counter("average_tweets_per_second", tps)
