@@ -2174,7 +2174,7 @@ def dump_userinfo():
     userinfo_data = get_all_userinfo()
     if userinfo_data is None:
         return
-    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "positive_words", "negative_hashtags", "positive_words", "negative_hashtags", "user_id_str"]
+    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "identifiers_matched", "positive_words", "negative_hashtags", "positive_words", "negative_hashtags", "user_id_str"]
     for category, raw_data in userinfo_data.iteritems():
         filename = "data/custom/userinfo_" + category + ".csv"
         debug_print("Writing userinfo: " + filename)
@@ -2596,7 +2596,8 @@ def process_tweet(status):
     info["mentions_seen"] = get_data("users", "mentioners", info["name"])
     info["mentioned"] = get_data("users", "mentioned", info["name"])
     hts = get_user_hashtag_data(info["name"])
-    info["used_hashtags"] = "[" + "|".join(hts) + "]"
+    if len(hts) > 0:
+        info["used_hashtags"] = "[" + "|".join(hts) + "]"
     info["reply_percent"] = 0
     info["retweet_percent"] = 0
     info["fake_news_percent"] = 0
@@ -2637,8 +2638,9 @@ def process_tweet(status):
 
 # Count suspicious description words
     if "description_matches" in info:
-        if len(info["description_matches"]) > 1:
-            info["suspiciousness_score"] += len(info["description_matches"]) * generic_multiplier * 2
+        if len(info["description_matches"]) > 0:
+            info["description_matched"] = "[" + "|".join(info["description_matches"]) + "]"
+            info["suspiciousness_score"] += len(info["description_matches"]) * generic_multiplier * 3
             info["suspiciousness_reasons"] += "[suspicious description words]"
 
 # Look for accounts with no description
@@ -2647,9 +2649,11 @@ def process_tweet(status):
         info["suspiciousness_reasons"] += "[no description]"
 
 # Count suspicious words in tweet text
-    if len(info["tweet_identifier_matches"]) > 1:
-        info["suspiciousness_score"] += len(info["tweet_identifier_matches"]) * generic_multiplier * 2
-        info["suspiciousness_reasons"] += "[suspicious words in tweets]"
+    if "tweet_identifier_matches" in info:
+        if len(info["tweet_identifier_matches"]) > 0:
+            info["identifiers_matched"] = "[" + "|".join(info["tweet_identifier_matches"]) + "]"
+            info["suspiciousness_score"] += len(info["tweet_identifier_matches"]) * generic_multiplier * 3
+            info["suspiciousness_reasons"] += "[suspicious words in tweets]"
 
 # Look for extremely heavy account activity
     if info["tweets_per_day"] > min_tweets_per_day:
