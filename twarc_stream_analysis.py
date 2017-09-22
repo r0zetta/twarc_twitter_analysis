@@ -2173,16 +2173,13 @@ def dump_userinfo():
     debug_print(sys._getframe().f_code.co_name)
     userinfo_data = get_all_userinfo()
     all_users_data = get_category_data("users", "all_users")
-    all_users_list = []
-    for n, c in all_users_data.iteritems():
-        if n not in all_users_list:
-            all_users_list.append(n)
     if userinfo_data is None:
         return
     userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "identifiers_matched", "positive_words", "negative_hashtags", "positive_words", "negative_hashtags", "user_id_str"]
     num_suspicious = 0
     bot_tweets = 0
     num_bots = 0
+    debug_print("dumping userinfo data")
     for category, raw_data in userinfo_data.iteritems():
         filename = "data/custom/userinfo_" + category + ".csv"
         debug_print("Writing userinfo: " + filename)
@@ -2198,7 +2195,7 @@ def dump_userinfo():
                     if key == "suspiciousness_reasons":
                         if "high activity" in data[key]:
                             num_bots += 1
-                            if name in all_users_list:
+                            if name in all_users_data:
                                 bot_tweets += int(all_users_data[name])
                     data_type = type(data[key])
                     if data_type is int:
@@ -2210,6 +2207,7 @@ def dump_userinfo():
                         handle.write(unicode(data[key]))
             handle.write(u"\n")
         handle.close
+    debug_print("calculating bot influence")
     set_counter("userinfo_suspicious", num_suspicious)
     set_counter("bot_count", num_bots)
     set_counter("bot_tweets", bot_tweets)
