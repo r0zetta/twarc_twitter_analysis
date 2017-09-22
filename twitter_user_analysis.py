@@ -236,7 +236,7 @@ def create_blocks(id_list):
     return id_blocks
 
 def query_blocks(id_blocks):
-    screen_names = []
+    details = []
     block_count = len(id_blocks.items())
     print "Found " + str(block_count) + " blocks."
     for block, data in id_blocks.iteritems():
@@ -244,14 +244,35 @@ def query_blocks(id_blocks):
         users_list = auth_api.lookup_users(user_ids=data)
         for item in users_list:
             screen_name = item.screen_name
-            if screen_name not in screen_names:
-                screen_names.append(screen_name)
-    return screen_names
+            description = item.description.replace('\n', ' ').replace("\t", " ")
+            location = item.location
+            if screen_name is not None and screen_name != "":
+                entry = {}
+                entry["name"] = screen_name
+                entry["desc"] = description
+                if entry["desc"] == "":
+                    entry["desc"] = "[no description]"
+                entry["location"] = location
+                if entry["location"] == "":
+                    entry["location"] = "[no location]"
+                details.append(entry)
+    return details
 
-def get_screen_names(id_list):
+def print_user_list_details(filename, details):
+    handle = io.open(filename, "w", encoding='utf-8')
+    handle.write(u"Name\tDescription\tLocation\n")
+    for item in details:
+        name = item["name"]
+        desc = item["desc"]
+        location = item["location"]
+        handle.write(unicode(name) + u"\t" + unicode(desc) + "\t" + unicode(location) + "\n")
+    handle.close
+
+
+def get_user_list_details(id_list):
     id_blocks = create_blocks(id_list)
-    screen_names = query_blocks(id_blocks)
-    return screen_names
+    details = query_blocks(id_blocks)
+    return details
 
 if __name__ == '__main__':
     acct_name, consumer_key, consumer_secret, access_token, access_token_secret = get_account_credentials()
@@ -430,15 +451,23 @@ if __name__ == '__main__':
 
     print "Getting followers for " + target
     followers = auth_api.followers_ids(target)
-    follower_names = get_screen_names(followers)
+    follower_details = get_user_list_details(followers)
 
     print "Getting followed for " + target
     friends = auth_api.friends_ids(target)
-    friends_names = get_screen_names(friends)
+    friend_details = get_user_list_details(friends)
 
     reciprocal_names = []
+    follower_names = []
+    friend_names = []
+    for item in follower_details:
+        if item["name"] not in follower_names:
+            follower_names.append(item["name"])
+    for item in friend_details:
+        if item["name"] not in friend_names:
+            friend_names.append(item["name"])
     for n in follower_names:
-        if n in friends_names:
+        if n in friend_names:
             if n not in reciprocal_names:
                 reciprocal_names.append(n)
     print
@@ -450,19 +479,13 @@ if __name__ == '__main__':
         os.makedirs(output_dir)
 
     filename = output_dir + target.encode('utf-8') + "-followers.txt"
-    handle = open(filename, 'w')
-    for n in follower_names:
-        handle.write(n + "\n")
-    handle.close()
+    print_user_list_details(filename, follower_details)
 
     filename = output_dir + target.encode('utf-8') + "-following.txt"
-    handle = open(filename, 'w')
-    for n in friends_names:
-        handle.write(n + "\n")
-    handle.close()
+    print_user_list_details(filename, friend_details)
 
     filename = output_dir + target.encode('utf-8') + "-reciprocal.txt"
-    handle = open(filename, 'w')
+    handle = open(filename, "w")
     for n in reciprocal_names:
         handle.write(n + "\n")
     handle.close()
