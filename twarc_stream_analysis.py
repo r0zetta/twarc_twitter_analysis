@@ -2326,7 +2326,9 @@ def dump_userinfo():
     set_counter("demographic_tweets", demographic_tweets)
     tweets_processed = get_counter("tweets_processed")
     bot_percent = float(float(bot_tweets)/float(tweets_processed))*100
+    demographic_percent = float(float(demographic_tweets)/float(tweets_processed))*100
     set_counter("bot_tweet_percentage", bot_percent)
+    set_counter("demographic_tweet_percentage", demographic_percent)
 
 def dump_highly_retweeted():
     debug_print(sys._getframe().f_code.co_name)
