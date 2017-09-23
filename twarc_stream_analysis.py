@@ -426,6 +426,64 @@ def dump_demographic_list():
             handle.write(n + u"\n")
         handle.close
 
+def record_demographic_detail(name, desc_words, tweet_words):
+    debug_print(sys._getframe().f_code.co_name)
+    desc = []
+    tweet = []
+    if "demographic_detail" in data:
+        if name in data["demographic_detail"]:
+            desc = data["demographic_detail"][name]["desc_words"]
+            tweet = data["demographic_detail"][name]["tweet_words"]
+    else:
+        data["demographic_detail"] = {}
+    for w in desc_words:
+        if w not in desc:
+            desc.append(w)
+    for w in tweet_words:
+        if w not in tweet:
+            tweet.append(w)
+    data["demographic_detail"][name] = {}
+    data["demographic_detail"][name]["desc_words"] = desc
+    data["demographic_detail"][name]["tweet_words"] = tweet
+
+def exists_demographic_detail(name):
+    debug_print(sys._getframe().f_code.co_name)
+    ret = False
+    if "demographic_detail" in data:
+        if name in data["demographic_detail"]:
+            ret = True
+    return ret
+
+def get_demographic_detail(name):
+    debug_print(sys._getframe().f_code.co_name)
+    desc = []
+    tweet = []
+    if "demographic_detail" in data:
+        if name in data["demographic_detail"]:
+            desc = data["demographic_detail"][name]["desc_words"]
+            tweet = data["demographic_detail"][name]["tweet_words"]
+    return desc, tweet
+
+def dump_demographic_detail():
+    debug_print(sys._getframe().f_code.co_name)
+    if "demographic_detail" in data:
+        filename = "data/custom/demographic_detail.txt"
+        handle = io.open(filename, "w", encoding='utf-8')
+        for name, stuff in data["demographic_detail"].iteritems():
+            desc = ""
+            tweet = ""
+            if len(stuff["desc_words"]) > 0:
+                desc = "[" + u", ".join(map(unicode, stuff["desc_words"])) + "]"
+            else:
+                desc = "[None]"
+            if len(stuff["tweet_words"]) > 0:
+                tweet = "[" + u", ".join(map(unicode, stuff["tweet_words"])) + "]"
+            else:
+                tweet = "[None]"
+            tweet = stuff["tweet_words"]
+            handle.write(unicode(name) + u"\t" + unicode(desc) + u"\t" + unicode(tweet) + u"\n")
+        handle.close()
+
 
 def record_sentiment(label, timestamp, value):
     debug_print(sys._getframe().f_code.co_name)
@@ -2355,6 +2413,7 @@ def dump_data():
     dump_retweet_spikes()
     dump_bot_list()
     dump_demographic_list()
+    dump_demographic_detail()
 
     debug_print("Completed dump...")
     return
@@ -2711,24 +2770,34 @@ def process_tweet(status):
     record_user = False
     info["suspiciousness_reasons"] = ""
 
-# Count suspicious description words
-    if "description_matches" in info:
-        if len(info["description_matches"]) > 0:
-            info["description_matched"] = "[" + "|".join(info["description_matches"]) + "]"
-            info["suspiciousness_score"] += len(info["description_matches"]) * generic_multiplier * 3
-            info["suspiciousness_reasons"] += "[suspicious description words]"
-
 # Look for accounts with no description
     if "description" not in status:
         info["suspiciousness_score"] += generic_multiplier
         info["suspiciousness_reasons"] += "[no description]"
 
-# Count suspicious words in tweet text
+# Record demographic data
+    current_descs = []
+    current_tweet_idents = []
+    if "description_matches" in info:
+        current_descs = info["description_matches"] 
     if "tweet_identifier_matches" in info:
-        if len(info["tweet_identifier_matches"]) > 0:
-            info["identifiers_matched"] = "[" + "|".join(info["tweet_identifier_matches"]) + "]"
-            info["suspiciousness_score"] += len(info["tweet_identifier_matches"]) * generic_multiplier * 3
-            info["suspiciousness_reasons"] += "[suspicious words in tweets]"
+        current_tweet_idents = info["tweet_identifier_matches"]
+    if len(current_descs) > 0  or len(current_tweet_idents) > 0:
+        record_demographic_detail(info["name"], current_descs, current_tweet_idents)
+    if exists_demographic_detail(info["name"]):
+        current_descs, current_tweet_idents = get_demographic_detail(info["name"])
+
+# Count suspicious description words
+    if len(current_descs) > 0:
+        info["description_matched"] = "[" + "|".join(current_descs) + "]"
+        info["suspiciousness_score"] += len(current_descs) * generic_multiplier * 3
+        info["suspiciousness_reasons"] += "[suspicious description words]"
+
+# Count suspicious words in tweet text
+    if len(current_tweet_idents) > 0:
+        info["identifiers_matched"] = "[" + "|".join(current_tweet_idents) + "]"
+        info["suspiciousness_score"] += len(current_tweet_idents) * generic_multiplier * 3
+        info["suspiciousness_reasons"] += "[suspicious words in tweets]"
 
 # Look for extremely heavy account activity
     if info["tweets_per_day"] > min_tweets_per_day:
