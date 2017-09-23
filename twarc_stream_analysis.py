@@ -382,6 +382,51 @@ def get_from_list_data(variable, category, name):
 # Custom storage and wrappers
 #############################
 
+def record_bot_list(name):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    if "bot_list" not in data:
+        data["bot_list"] = []
+    if name not in data["bot_list"]:
+        data["bot_list"].append(name)
+
+def get_bot_list():
+    debug_print(sys._getframe().f_code.co_name)
+    if "bot_list" in data:
+        return data["bot_list"]
+
+def dump_bot_list():
+    debug_print(sys._getframe().f_code.co_name)
+    if "bot_list" in data:
+        filename = "data/custom/bots.txt"
+        handle = io.open(filename, "w", encoding='utf-8')
+        for n in data["bot_list"]:
+            handle.write(n + u"\n")
+        handle.close
+
+def record_demographic(name):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    if "demographic" not in data:
+        data["demographic"] = []
+    if name not in data["demographic"]:
+        data["demographic"].append(name)
+
+def get_demographic():
+    debug_print(sys._getframe().f_code.co_name)
+    if "demographic" in data:
+        return data["demographic"]
+
+def dump_demographic_list():
+    debug_print(sys._getframe().f_code.co_name)
+    if "demographic" in data:
+        filename = "data/custom/demographics.txt"
+        handle = io.open(filename, "w", encoding='utf-8')
+        for n in data["demographic"]:
+            handle.write(n + u"\n")
+        handle.close
+
+
 def record_sentiment(label, timestamp, value):
     debug_print(sys._getframe().f_code.co_name)
     sentiment_value = 0
@@ -2179,6 +2224,8 @@ def dump_userinfo():
     num_suspicious = 0
     bot_tweets = 0
     num_bots = 0
+    num_demographic = 0
+    demographic_tweets = 0
     debug_print("dumping userinfo data")
     for category, raw_data in userinfo_data.iteritems():
         filename = "data/custom/userinfo_" + category + ".csv"
@@ -2193,8 +2240,14 @@ def dump_userinfo():
                 handle.write(u", ")
                 if key in data:
                     if key == "suspiciousness_reasons":
+                        if "suspicious" in data[key]:
+                            num_demographic += 1
+                            record_demographic(name)
+                            if name in all_users_data:
+                                demographic_tweets += int(all_users_data[name])
                         if "high activity" in data[key]:
                             num_bots += 1
+                            record_bot_list(name)
                             if name in all_users_data:
                                 bot_tweets += int(all_users_data[name])
                     data_type = type(data[key])
@@ -2210,7 +2263,9 @@ def dump_userinfo():
     debug_print("calculating bot influence")
     set_counter("userinfo_suspicious", num_suspicious)
     set_counter("bot_count", num_bots)
+    set_counter("demographic_count", num_demographic)
     set_counter("bot_tweets", bot_tweets)
+    set_counter("demographic_tweets", demographic_tweets)
     tweets_processed = get_counter("tweets_processed")
     bot_percent = float(float(bot_tweets)/float(tweets_processed))*100
     set_counter("bot_tweet_percentage", bot_percent)
@@ -2298,6 +2353,8 @@ def dump_data():
     dump_sentiment_volume_graphs()
     process_retweet_frequency()
     dump_retweet_spikes()
+    dump_bot_list()
+    dump_demographic_list()
 
     debug_print("Completed dump...")
     return
