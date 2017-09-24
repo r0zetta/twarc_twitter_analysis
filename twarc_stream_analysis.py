@@ -22,6 +22,7 @@ import string
 ##################
 # Global variables
 ##################
+stopping = False
 restart = False
 threaded = True
 debug = False
@@ -50,7 +51,7 @@ def init_params():
     conf["params"]["purge_interval"] = 300
     conf["params"]["retweet_spike_window"] = 120
     conf["params"]["retweet_spike_minimum"] = 100
-    conf["params"]["retweet_spike_per_second_minimum"] = 1
+    conf["params"]["retweet_spike_per_second_minimum"] = 0.4
     conf["params"]["tweet_spike_minimum"] = 1.8
     conf["params"]["time_to_live"] = 8 * 60 * 60
     conf["params"]["max_to_output"] = 250
@@ -1425,10 +1426,11 @@ def read_config_preserve_case(filename):
 
 def cleanup():
     debug_print(sys._getframe().f_code.co_name)
-    global dump_file_handle
+    global dump_file_handle, stopping
     if threaded == True:
         if get_active_threads > 1:
             print "Waiting for queue to empty..."
+            stopping = True
             tweet_queue.join()
     dump_file_handle.close()
     volume_file_handle.close()
@@ -1549,6 +1551,7 @@ def unserialize_variable(varname):
 def serialize_data():
     debug_print(sys._getframe().f_code.co_name)
     debug_print("Serializing...")
+    print "Serializing..."
     serialize_dir = "serialized"
     tmp_dir = "serialized.tmp"
     old_dir = "serialized.old"
@@ -1560,6 +1563,7 @@ def serialize_data():
             os.makedirs(serialize_dir)
     serialize_variable(data, "data")
     debug_print("Serialization finished...")
+    print "Serialization finished."
     if os.path.exists(old_dir):
         shutil.rmtree(old_dir)
     return
@@ -2485,7 +2489,7 @@ def process_tweet(status):
         info["retweet_count"] = status["retweet_count"]
         if "retweet_text" in status:
             info["retweet_text"] = status["retweet_text"]
-        if int(info["retweet_count"]) > 1000 and "retweet_text" in info:
+        if int(info["retweet_count"]) > 500 and "retweet_text" in info:
             printable_text = info["retweet_text"].replace("\n", " ")
             record_highly_retweeted(printable_text, info["retweet_count"])
     info["account_age_days"] = 0
@@ -3055,6 +3059,8 @@ def capture_status_items(status):
 def dump_event():
     debug_print(sys._getframe().f_code.co_name)
     global data, volume_file_handle
+    if stopping == True:
+        return
     if int(time.time()) > get_counter("previous_dump_time") + get_counter("dump_interval"):
         start_time = int(time.time())
         gathering_time = start_time - get_counter("previous_dump_time") - get_counter("dump_interval")
