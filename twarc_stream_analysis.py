@@ -2624,7 +2624,7 @@ def process_tweet(status):
                     if "retweet_count" in info:
                         if info["retweet_count"] > 10:
                             record_suspicious_retweet(retweet_text, info["tweet_time_unix"], retweet_id, info["name"], info["retweeted_name"], account_age, followers, tweets, info["retweet_count"])
-                    increment_counter("suspicious_retweets")
+                            increment_counter("suspicious_retweets")
             increment_heatmap("retweets", tweet_time_object)
             increment_per_hour("retweeters", info["datestring"], info["name"])
             add_graphing_data("retweets", info["name"], info["retweeted_name"])
