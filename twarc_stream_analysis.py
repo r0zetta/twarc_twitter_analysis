@@ -507,7 +507,7 @@ def record_sentiment(label, timestamp, value):
             record_sentiment_volume(label, timestamp, sentiment_value)
             set_counter(prev_label, current_time)
 
-def record_suspicious_retweet(text, timestamp, id_str, name, retweeted_name, account_age, followers, tweets):
+def record_suspicious_retweet(text, timestamp, id_str, name, retweeted_name, account_age, followers, tweets, retweet_count):
     debug_print(sys._getframe().f_code.co_name)
     global data
     if "suspicious_retweets" not in data:
@@ -517,6 +517,8 @@ def record_suspicious_retweet(text, timestamp, id_str, name, retweeted_name, acc
         increment_counter("suspiciously_retweeted")
     if "twtid" not in data["suspicious_retweets"][text]:
         data["suspicious_retweets"][text]["twtid"] = id_str
+    if "retweet_count" not in data["suspicious_retweets"][text]:
+        data["suspicious_retweets"][text]["retweet_count"] = retweet_count
     if "retweeted_name" not in data["suspicious_retweets"][text]:
         data["suspicious_retweets"][text]["retweeted_name"] = retweeted_name
     if "account_age" not in data["suspicious_retweets"][text]:
@@ -543,11 +545,10 @@ def dump_suspicious_retweets():
             handle.write(unicode(tweet) + u"\n")
             handle.write(u"Tweet ID: " + unicode(stuff["twtid"]) + "\n")
             handle.write(u"Retweeted: " + unicode(stuff["retweeted_name"]) + "\n")
+            handle.write(u"Retweet count: " + unicode(stuff["retweet_count"]) + "\n")
             handle.write(u"Account age: " + unicode("%.2f"%float(stuff["account_age"]/(60*60*24))) + " days\n")
             handle.write(u"Followers: " + unicode(stuff["followers"]) + "\n")
             handle.write(u"Tweets: " + unicode(stuff["tweets"]) + "\n")
-            #handle.write(u"Timestamps:\n")
-            #handle.write(u", ".join(map(unicode, stuff["timestamps"])) + "\n")
             handle.write(u"Names:\n")
             handle.write(u", ".join(map(unicode, stuff["names"])) + "\n")
             handle.write(u"\n")
@@ -2620,7 +2621,9 @@ def process_tweet(status):
                 if tweets is not None and tweets < 100:
                     retweet_unworthiness += 1
                 if retweet_unworthiness >= 2:
-                    record_suspicious_retweet(retweet_text, info["tweet_time_unix"], retweet_id, info["name"], info["retweeted_name"], account_age, followers, tweets)
+                    if "retweet_count" in info:
+                        if info["retweet_count"] > 10:
+                            record_suspicious_retweet(retweet_text, info["tweet_time_unix"], retweet_id, info["name"], info["retweeted_name"], account_age, followers, tweets, info["retweet_count"])
                     increment_counter("suspicious_retweets")
             increment_heatmap("retweets", tweet_time_object)
             increment_per_hour("retweeters", info["datestring"], info["name"])
