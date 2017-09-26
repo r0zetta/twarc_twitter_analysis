@@ -2623,6 +2623,7 @@ def process_tweet(status):
                 if retweet_unworthiness >= 2:
                     if "retweet_count" in info:
                         if info["retweet_count"] > 10:
+                            info["retweeted_suspicious"] = True
                             record_suspicious_retweet(retweet_text, info["tweet_time_unix"], retweet_id, info["name"], info["retweeted_name"], account_age, followers, tweets, info["retweet_count"])
                             increment_counter("suspicious_retweets")
             increment_heatmap("retweets", tweet_time_object)
@@ -2867,6 +2868,11 @@ def process_tweet(status):
     if "description" not in status:
         info["suspiciousness_score"] += generic_multiplier
         info["suspiciousness_reasons"] += "[no description]"
+
+# Did this user publish a suspicious retweet
+    if "retweeted_suspicious" in info:
+        info["suspiciousness_score"] += generic_multiplier
+        info["suspiciousness_reasons"] += "[suspicious retweet]"
 
 # Record demographic data
     current_descs = []
