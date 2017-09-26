@@ -19,6 +19,8 @@ import base64
 import hashlib
 import string
 
+# record retweets of tweets made by suspicious accounts
+
 ##################
 # Global variables
 ##################
@@ -505,6 +507,52 @@ def record_sentiment(label, timestamp, value):
             record_sentiment_volume(label, timestamp, sentiment_value)
             set_counter(prev_label, current_time)
 
+def record_suspicious_retweet(text, timestamp, id_str, name, retweeted_name, account_age, followers, tweets):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    if "suspicious_retweets" not in data:
+        data["suspicious_retweets"] = {}
+    if text not in data["suspicious_retweets"]:
+        data["suspicious_retweets"][text] = {}
+        increment_counter("suspiciously_retweeted")
+    if "twtid" not in data["suspicious_retweets"][text]:
+        data["suspicious_retweets"][text]["twtid"] = id_str
+    if "retweeted_name" not in data["suspicious_retweets"][text]:
+        data["suspicious_retweets"][text]["retweeted_name"] = retweeted_name
+    if "account_age" not in data["suspicious_retweets"][text]:
+        data["suspicious_retweets"][text]["account_age"] = account_age
+    if "followers" not in data["suspicious_retweets"][text]:
+        data["suspicious_retweets"][text]["followers"] = followers
+    if "tweets" not in data["suspicious_retweets"][text]:
+        data["suspicious_retweets"][text]["tweets"] = tweets
+    if "names" not in data["suspicious_retweets"][text]:
+        data["suspicious_retweets"][text]["names"] = []
+    if "timestamps" not in data["suspicious_retweets"][text]:
+        data["suspicious_retweets"][text]["timestamps"] = []
+    if name not in data["suspicious_retweets"][text]["names"]:
+        data["suspicious_retweets"][text]["names"].append(name)
+    if timestamp not in data["suspicious_retweets"][text]["timestamps"]:
+        data["suspicious_retweets"][text]["timestamps"].append(timestamp)
+
+def dump_suspicious_retweets():
+    debug_print(sys._getframe().f_code.co_name)
+    if "suspicious_retweets" in data:
+        filename = "data/custom/suspicious_retweets.txt"
+        handle = io.open(filename, "w", encoding='utf-8')
+        for tweet, stuff in data["suspicious_retweets"].iteritems():
+            handle.write(unicode(tweet) + u"\n")
+            handle.write(u"Tweet ID: " + unicode(stuff["twtid"]) + "\n")
+            handle.write(u"Retweeted: " + unicode(stuff["retweeted_name"]) + "\n")
+            handle.write(u"Account age: " + unicode("%.2f"%float(stuff["account_age"]/(60*60*24))) + " days\n")
+            handle.write(u"Followers: " + unicode(stuff["followers"]) + "\n")
+            handle.write(u"Tweets: " + unicode(stuff["tweets"]) + "\n")
+            #handle.write(u"Timestamps:\n")
+            #handle.write(u", ".join(map(unicode, stuff["timestamps"])) + "\n")
+            handle.write(u"Names:\n")
+            handle.write(u", ".join(map(unicode, stuff["names"])) + "\n")
+            handle.write(u"\n")
+        handle.close()
+
 def record_retweet_frequency(text, timestamp, id_str, name):
     debug_print(sys._getframe().f_code.co_name)
     global data
@@ -532,9 +580,6 @@ def record_retweet_frequency(text, timestamp, id_str, name):
     if "names" not in data["retweet_frequency"]["retweet_metadata"][text]:
         data["retweet_frequency"]["retweet_metadata"][text]["names"] = []
     data["retweet_frequency"]["retweet_metadata"][text]["names"].append(name)
-
-
-
 
 def delete_retweet_frequency(delete_list):
     debug_print(sys._getframe().f_code.co_name)
@@ -1210,6 +1255,14 @@ def twarc_time_to_object(time_string):
         new_string = first_bit + " " + last_bit
         date_object = datetime.strptime(new_string, twarc_format)
         return date_object
+
+def twarc_time_to_unix(time_string):
+    return time_object_to_unix(twarc_time_to_object(time_string))
+
+def seconds_since_twarc_time(time_string):
+    input_time_unix = int(twarc_time_to_unix(time_string))
+    current_time_unix = int(get_utc_unix_time())
+    return current_time_unix - input_time_unix
 
 def time_object_to_readable(time_object):
     return time_object.strftime("%Y-%m-%d %H:%M:%S")
@@ -2417,6 +2470,7 @@ def dump_data():
     dump_sentiment_volume_graphs()
     process_retweet_frequency()
     dump_retweet_spikes()
+    dump_suspicious_retweets()
     dump_bot_list()
     dump_demographic_list()
     dump_demographic_detail()
@@ -2538,11 +2592,36 @@ def process_tweet(status):
         info["retweeted_name"] = status["retweeted_screen_name"]
         if info["retweeted_name"] is not None:
             add_data("users", "retweeters", info["name"])
+            retweet_id = ""
+            retweet_text = ""
             if "retweet_text" in status:
-                retweet_id = ""
-                if "retweet_id" in status:
-                    retweet_id = status["retweet_id_str"]
-                record_retweet_frequency(status["retweet_text"], info["tweet_time_unix"], retweet_id, info["name"])
+                retweet_text = status["retweet_text"]
+            if "retweet_id_str" in status:
+                retweet_id = status["retweet_id_str"]
+            record_retweet_frequency(retweet_text, info["tweet_time_unix"], retweet_id, info["name"])
+            if "retweeted_user" in status:
+                retweeted_user = status["retweeted_user"]
+                min_account_age = 60*60*24*30
+                retweet_unworthiness = 0
+                account_age = None
+                followers = None
+                tweets = None
+                if "created_at" in retweeted_user:
+                    c = retweeted_user["created_at"]
+                    account_age = seconds_since_twarc_time(c)
+                if "followers_count" in retweeted_user:
+                    followers = retweeted_user["followers_count"]
+                if "statuses_count" in retweeted_user:
+                    tweets = retweeted_user["statuses_count"]
+                if account_age is not None and account_age < min_account_age:
+                    retweet_unworthiness += 1
+                if followers is not None and followers < 100:
+                    retweet_unworthiness += 1
+                if tweets is not None and tweets < 100:
+                    retweet_unworthiness += 1
+                if retweet_unworthiness >= 2:
+                    record_suspicious_retweet(retweet_text, info["tweet_time_unix"], retweet_id, info["name"], info["retweeted_name"], account_age, followers, tweets)
+                    increment_counter("suspicious_retweets")
             increment_heatmap("retweets", tweet_time_object)
             increment_per_hour("retweeters", info["datestring"], info["name"])
             add_graphing_data("retweets", info["name"], info["retweeted_name"])
@@ -2657,6 +2736,7 @@ def process_tweet(status):
     if "urls" in status:
         info["urls"] = status["urls"]
         if len(info["urls"]) > 0:
+            increment_counter("tweets_with_urls")
             for u in info["urls"]:
                 if u is not None:
                     add_data("metadata", "all_urls", u)
@@ -2679,8 +2759,10 @@ def process_tweet(status):
                             add_data("users", label + "_tweeter", info["name"])
                             add_timeline_data(info["tweet_time_readable"], info["name"], "tweeted keyword url about", k, info["tweet_id"])
                             increment_heatmap("keyword_urls", tweet_time_object)
+                    fake_news_found = False
                     for f in conf["corpus"]["fake_news_sources"]:
                         if f in u:
+                            fake_news_found = True
                             increment_heatmap("fake_news", tweet_time_object)
                             increment_counter("fake_news_tweets")
                             increment_per_hour("fake_news_urls", info["datestring"], u)
@@ -2691,6 +2773,8 @@ def process_tweet(status):
                             for h in info["hashtags"]:
                                 increment_per_hour("fake_news_hashtags", info["datestring"], h)
                                 add_data("metadata", "fake_news_hashtags", h)
+                    if fake_news_found == True:
+                        increment_counter("tweets_with_fake_news_urls")
 
 # Mentioned
     if "mentioned" in status:
@@ -2952,20 +3036,22 @@ def capture_status_items(status):
 # retweet data
     if "retweeted_status" in status:
         orig_tweet = status["retweeted_status"]
+        captured_status["retweet"] = True
         if "user" in orig_tweet:
             if orig_tweet["user"] is not None:
+                retweeted_user = orig_tweet["user"]
+                captured_status["retweeted_user"] = retweeted_user
                 if "retweet_count" in orig_tweet:
                     captured_status["retweet_count"] = orig_tweet["retweet_count"]
                 if "full_text" in orig_tweet:
                     captured_status["retweet_text"] = orig_tweet["full_text"]
-                if "id_str" in orig_tweet:
-                    captured_status["retweet_id_str"] = orig_tweet["id_str"]
                 elif "text" in orig_tweet:
                     captured_status["retweet_text"] = orig_tweet["text"]
+                if "id_str" in orig_tweet:
+                    captured_status["retweet_id_str"] = orig_tweet["id_str"]
                 if "screen_name" in orig_tweet["user"]:
-                    if orig_tweet["user"]["screen_name"] is not None:
-                        captured_status["retweeted_screen_name"] = orig_tweet["user"]["screen_name"]
-                        captured_status["retweet"] = True
+                    if retweeted_user["screen_name"] is not None:
+                        captured_status["retweeted_screen_name"] = retweeted_user["screen_name"]
     if "retweeted_screen_name" not in captured_status:
         rt_name = re.search("^RT @(\w+)\W", captured_status["text"])
         if rt_name is not None:
