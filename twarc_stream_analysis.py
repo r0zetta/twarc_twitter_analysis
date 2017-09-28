@@ -20,6 +20,8 @@ import hashlib
 import string
 
 # record retweets of tweets made by suspicious accounts
+# Count accounts that make suspicious retweets
+# Record actual tweet URLs
 
 ##################
 # Global variables
@@ -70,8 +72,10 @@ def init_config():
     conf["config"]["log_words"] = True
     conf["config"]["log_network_data"] = True
     conf["config"]["log_all_userinfo"] = False
-    conf["config"]["dump_interarrivals"] = True
-    conf["config"]["dump_timeline_data"] = False
+    conf["config"]["log_per_hour_data"] = False
+    conf["config"]["log_user_data"] = False
+    conf["config"]["log_interarrivals"] = True
+    conf["config"]["log_timeline_data"] = False
     conf["config"]["dump_raw_data"] = False
     conf["config"]["dump_graphs"] = True
     conf["config"]["sanitize_text"] = False
@@ -507,7 +511,7 @@ def record_sentiment(label, timestamp, value):
             record_sentiment_volume(label, timestamp, sentiment_value)
             set_counter(prev_label, current_time)
 
-def record_suspicious_retweet(text, timestamp, id_str, name, retweeted_name, account_age, followers, tweets, retweet_count):
+def record_suspicious_retweet(text, url, timestamp, id_str, name, retweeted_name, account_age, followers, tweets, retweet_count):
     debug_print(sys._getframe().f_code.co_name)
     global data
     if "suspicious_retweets" not in data:
@@ -517,6 +521,8 @@ def record_suspicious_retweet(text, timestamp, id_str, name, retweeted_name, acc
         increment_counter("suspiciously_retweeted")
     if "twtid" not in data["suspicious_retweets"][text]:
         data["suspicious_retweets"][text]["twtid"] = id_str
+    if "url" not in data["suspicious_retweets"][text]:
+        data["suspicious_retweets"][text]["url"] = url
     if "retweet_count" not in data["suspicious_retweets"][text]:
         data["suspicious_retweets"][text]["retweet_count"] = retweet_count
     if "retweeted_name" not in data["suspicious_retweets"][text]:
@@ -544,6 +550,7 @@ def dump_suspicious_retweets():
         for tweet, stuff in data["suspicious_retweets"].iteritems():
             handle.write(unicode(tweet) + u"\n")
             handle.write(u"Tweet ID: " + unicode(stuff["twtid"]) + "\n")
+            handle.write(u"URL: " + unicode(stuff["url"]) + "\n")
             handle.write(u"Retweeted: " + unicode(stuff["retweeted_name"]) + "\n")
             handle.write(u"Retweet count: " + unicode(stuff["retweet_count"]) + "\n")
             handle.write(u"Account age: " + unicode("%.2f"%float(stuff["account_age"]/(60*60*24))) + " days\n")
@@ -554,7 +561,7 @@ def dump_suspicious_retweets():
             handle.write(u"\n")
         handle.close()
 
-def record_retweet_frequency(text, timestamp, id_str, name):
+def record_retweet_frequency(text, url, timestamp, id_str, name):
     debug_print(sys._getframe().f_code.co_name)
     global data
     if "retweet_frequency" not in data:
@@ -578,6 +585,7 @@ def record_retweet_frequency(text, timestamp, id_str, name):
     if text not in data["retweet_frequency"]["retweet_metadata"]:
         data["retweet_frequency"]["retweet_metadata"][text] = {}
     data["retweet_frequency"]["retweet_metadata"][text]["id_str"] = id_str
+    data["retweet_frequency"]["retweet_metadata"][text]["url"] = url
     if "names" not in data["retweet_frequency"]["retweet_metadata"][text]:
         data["retweet_frequency"]["retweet_metadata"][text]["names"] = []
     data["retweet_frequency"]["retweet_metadata"][text]["names"].append(name)
@@ -594,7 +602,7 @@ def delete_retweet_frequency(delete_list):
         del data["retweet_frequency"]["retweet_counter"][text]
         del data["retweet_frequency"]["retweet_metadata"][text]
 
-def set_retweet_spike_data(text, id_str, first_seen, last_seen, count, names):
+def set_retweet_spike_data(text, url, id_str, first_seen, last_seen, count, names):
     debug_print(sys._getframe().f_code.co_name)
     global data
     new_count = count
@@ -611,6 +619,7 @@ def set_retweet_spike_data(text, id_str, first_seen, last_seen, count, names):
     spike_record["first_seen"] = real_first_seen
     spike_record["last_seen"] = last_seen
     spike_record["count"] = new_count
+    spike_record["url"] = url
     spike_record["id_str"] = id_str
     spike_record["names"] = names
     data["retweet_spikes"][text] = spike_record
@@ -626,6 +635,7 @@ def dump_retweet_spikes():
             spike_count += 1
             text = text.replace('\n', ' ')
             handle.write(u"Tweet:\t" + unicode(text) + u"\n")
+            handle.write(u"URL:\t" + unicode(stuff["url"]) + u"\n")
             handle.write(u"Id:\t" + unicode(stuff["id_str"]) + u"\n")
             handle.write(u"Start time:\t" + unicode(unix_time_to_readable(stuff["first_seen"])) + u"\n")
             handle.write(u"End time:\t" + unicode(unix_time_to_readable(stuff["last_seen"])) + u"\n")
@@ -677,7 +687,8 @@ def process_retweet_frequency():
                         metadata = data["retweet_frequency"]["retweet_metadata"][text]
                         id_str = metadata["id_str"]
                         names = metadata["names"]
-                        set_retweet_spike_data(text, id_str, start, end, count, names)
+                        url = metadata["url"]
+                        set_retweet_spike_data(text, url, id_str, start, end, count, names)
     if len(delete_list) > 0:
         delete_retweet_frequency(delete_list)
 
@@ -970,6 +981,8 @@ def get_category_previous_seen(category):
 
 def add_data(variable, category, name):
     debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["log_user_data"] == False:
+        return
     ret = increment_storage_large(variable, category, name)
     handling = "keep"
     if "params" in conf:
@@ -979,8 +992,6 @@ def add_data(variable, category, name):
         set_previous_seen(variable, name)
     if ret is True:
         increment_counter(variable + "_" + category)
-    if threaded == False:
-        add_top_data(variable, category, name)
     return ret
 
 def get_data(variable, category, name):
@@ -1015,6 +1026,8 @@ def del_data(variable, category, name):
 
 def increment_per_hour(category, datestring, name):
     debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["log_per_hour_data"] == False:
+        return
     increment_storage("per_day_data", category + "_" + datestring[:-2], name)
     return increment_storage("per_hour_data", category + "_" + datestring, name)
 
@@ -1068,33 +1081,6 @@ def del_from_periodic_data(data_type, category):
     debug_print(sys._getframe().f_code.co_name)
     del_category_from_storage(data_type, category)
 
-# XXX This is definitely broken
-def add_top_data(variable, category, name):
-    debug_print(sys._getframe().f_code.co_name)
-    seen = 0
-    current = 0
-    threshold = conf["params"]["min_top_score"]
-    counter_name = "average_high_" + variable + "_" + category
-    if get_counter(counter_name) > 10.0:
-        threshold = get_counter(counter_name) - conf["params"]["min_top_score"]
-    threshold = int(threshold)
-    seen = get_data(variable, category, name)
-    current = get_data("top_" + variable, category, name)
-    if exists_data("top_" + variable, category, name) == True:
-        if current < threshold:
-            del_from_storage_large("top_" + variable, category, name)
-            return
-    if seen >= threshold:
-        set_data("top_" + variable, category, name, seen)
-
-def get_from_users(category, name):
-    debug_print(sys._getframe().f_code.co_name)
-    return get_data("users", category, name)
-
-def get_from_metadata(category, name):
-    debug_print(sys._getframe().f_code.co_name)
-    return get_data("metadata", category, name)
-
 def add_graphing_data(category, username, item):
     debug_print(sys._getframe().f_code.co_name)
     if conf["config"]["log_network_data"] == True:
@@ -1137,62 +1123,6 @@ def record_associations(name):
     set_associations("links_out", name, len(links_out))
     set_associations("links_in", name, len(links_in))
     set_associations("two_way", name, len(two_way))
-
-# XXX This is definitely broken
-def get_average_high(prefix):
-    debug_print(sys._getframe().f_code.co_name)
-    dataset = {}
-    counter_name = ""
-    variable = "top_" + prefix
-    dataset = get_all_data(variable)
-    for category, stuff in dataset.iteritems():
-        counter_name = "average_high_" + prefix + "_" + category
-        total_counter_name = prefix + "_" + category
-        counts = []
-        for name, count in stuff.iteritems():
-            if type(count) is int:
-                if count >= conf["params"]["min_top_score"]:
-                    counts.append(count)
-        c = 0
-        top_group = []
-        next_group = []
-        count_len = len(counts)
-        if count_len >= 10:
-            for x in sorted(counts, reverse = True):
-                if c >= count_len:
-                    break
-                if c < 5:
-                    top_group.append(x)
-                elif c > 5 and c < count_len:
-                    next_group.append(x)
-                c += 1
-            av_top_group = get_average(top_group)
-            av_next_group = get_average(next_group)
-            if av_next_group < ((av_top_group * 9) / 10):
-                set_counter(counter_name, av_next_group)
-            else:
-                set_counter(counter_name, av_top_group)
-        else:
-            set_counter(counter_name, 5)
-
-# XXX Nothing even calls this
-def get_highest_tweet_count_average():
-    debug_print(sys._getframe().f_code.co_name)
-    average = 0.0
-    highest_counts = []
-    counts = []
-    keyval = get_category_storage_large("users", "all_users")
-    for name, count in keyval.iteritems():
-        counts.append(count)
-    c = 0
-    for x in sorted(counts, reverse = True):
-        if c > 10:
-            break
-        highest_counts.append(x)
-        c += 1
-    if len(highest_counts) > 0:
-        average = float(np.mean(highest_counts))
-    return average
 
 ##########
 # Counters
@@ -1645,7 +1575,7 @@ def add_timeline_data(date, name, action, item, twt_id):
     if name in conf["settings"]["monitored_users"]:
         filename = "data/custom/timeline_" + name + ".csv"
         write_timeline(filename, date, name, action, item, twt_id)
-    if conf["config"]["dump_timeline_data"] is True:
+    if conf["config"]["log_timeline_data"] is True:
         filename = "data/custom/timeline.csv"
         write_timeline(filename, date, name, action, item, twt_id)
 
@@ -2412,11 +2342,6 @@ def dump_data():
     debug_print(sys._getframe().f_code.co_name)
     debug_print("Starting dump...")
 
-    debug_print("Calculating average_high for all counters")
-    if threaded == False:
-        get_average_high("users")
-        get_average_high("metadata")
-
     debug_print("Dumping periodic data")
     data_types = ["per_hour_data", "per_day_data"]
     for d in data_types:
@@ -2448,7 +2373,7 @@ def dump_data():
         dump_heatmap(name)
 
     debug_print("Dumping interarrivals.")
-    if conf["config"]["dump_interarrivals"] == True:
+    if conf["config"]["log_interarrivals"] == True:
         dump_interarrivals()
 
     debug_print("Dumping heatmap comparison.")
@@ -2595,14 +2520,17 @@ def process_tweet(status):
             add_data("users", "retweeters", info["name"])
             retweet_id = ""
             retweet_text = ""
+            retweet_url = ""
             if "retweet_text" in status:
                 retweet_text = status["retweet_text"]
             if "retweet_id_str" in status:
                 retweet_id = status["retweet_id_str"]
-            record_retweet_frequency(retweet_text, info["tweet_time_unix"], retweet_id, info["name"])
+            if "retweeted_tweet_url" in status:
+                retweet_url = status["retweeted_tweet_url"]
+            record_retweet_frequency(retweet_text, retweet_url, info["tweet_time_unix"], retweet_id, info["name"])
             if "retweeted_user" in status:
                 retweeted_user = status["retweeted_user"]
-                min_account_age = 60*60*24*30
+                min_account_age = 60*60*24*20
                 retweet_unworthiness = 0
                 account_age = None
                 followers = None
@@ -2616,16 +2544,17 @@ def process_tweet(status):
                     tweets = retweeted_user["statuses_count"]
                 if account_age is not None and account_age < min_account_age:
                     retweet_unworthiness += 1
-                if followers is not None and followers < 100:
+                if followers is not None and followers < 50:
                     retweet_unworthiness += 1
-                if tweets is not None and tweets < 100:
+                if tweets is not None and tweets < 50:
                     retweet_unworthiness += 1
                 if retweet_unworthiness >= 2:
                     if "retweet_count" in info:
                         if info["retweet_count"] > 10:
                             info["retweeted_suspicious"] = True
-                            record_suspicious_retweet(retweet_text, info["tweet_time_unix"], retweet_id, info["name"], info["retweeted_name"], account_age, followers, tweets, info["retweet_count"])
-                            increment_counter("suspicious_retweets")
+                            if "quote_tweet" not in status:
+                                record_suspicious_retweet(retweet_text, retweet_url, info["tweet_time_unix"], retweet_id, info["name"], info["retweeted_name"], account_age, followers, tweets, info["retweet_count"])
+                                increment_counter("suspicious_retweets")
             increment_heatmap("retweets", tweet_time_object)
             increment_per_hour("retweeters", info["datestring"], info["name"])
             add_graphing_data("retweets", info["name"], info["retweeted_name"])
@@ -2637,8 +2566,8 @@ def process_tweet(status):
 
 # Quote tweets
     info["quote_tweeted_name"] = ""
-    if "quote_tweeted_screen_name" in status:
-        info["quote_tweeted_name"] = status["quote_tweeted_screen_name"]
+    if "quoted_screen_name" in status:
+        info["quote_tweeted_name"] = status["quoted_screen_name"]
         if info["quote_tweeted_name"] is not None:
             add_graphing_data("quote_tweets", info["name"], info["quote_tweeted_name"])
             add_timeline_data(info["tweet_time_readable"], info["name"], "quote_tweeted", info["quote_tweeted_name"], info["tweet_id"])
@@ -3045,7 +2974,8 @@ def capture_status_items(status):
 # retweet data
     if "retweeted_status" in status:
         orig_tweet = status["retweeted_status"]
-        captured_status["retweet"] = True
+        if "id_str" in orig_tweet:
+            captured_status["retweeted_tweet_id"] = orig_tweet["id_str"]
         if "user" in orig_tweet:
             if orig_tweet["user"] is not None:
                 retweeted_user = orig_tweet["user"]
@@ -3061,17 +2991,26 @@ def capture_status_items(status):
                 if "screen_name" in orig_tweet["user"]:
                     if retweeted_user["screen_name"] is not None:
                         captured_status["retweeted_screen_name"] = retweeted_user["screen_name"]
+                        if "retweeted_tweet_id" in captured_status:
+                            captured_status["retweeted_tweet_url"] = "https://twitter.com/" + captured_status["retweeted_screen_name"] + "/status/" + captured_status["retweeted_tweet_id"]
+                        captured_status["retweet"] = True
+# XXX Removed this functionality, since it doesn't properly return retweeted object
+    """
     if "retweeted_screen_name" not in captured_status:
         rt_name = re.search("^RT @(\w+)\W", captured_status["text"])
         if rt_name is not None:
             captured_status["retweeted_screen_name"] = rt_name.group(1)
             captured_status["retweet"] = True
+    """
 
 # quote tweet data
     if "quoted_status" in status:
         orig_tweet = status["quoted_status"]
+        if "id_str" in orig_tweet:
+            captured_status["quoted_tweet_id"] = orig_tweet["id_str"]
         if "user" in orig_tweet:
             if orig_tweet["user"] is not None:
+                captured_status["quoted_user"] = orig_tweet["user"]
                 if "retweet_count" in orig_tweet:
                     captured_status["retweet_count"] = orig_tweet["retweet_count"]
                 if "full_text" in orig_tweet:
@@ -3080,7 +3019,9 @@ def capture_status_items(status):
                     captured_status["retweet_text"] = orig_tweet["text"]
                 if "screen_name" in orig_tweet["user"]:
                     if orig_tweet["user"]["screen_name"] is not None:
-                        captured_status["quote_tweeted_screen_name"] = orig_tweet["user"]["screen_name"]
+                        captured_status["quoted_screen_name"] = orig_tweet["user"]["screen_name"]
+                        if "quoted_tweet_id" in captured_status:
+                            captured_status["quoted_tweet_url"] = "https://twitter.com/" + captured_status["quoted_screen_name"] + "/status/" + captured_status["quoted_tweet_id"]
                         captured_status["quote_tweet"] = True
 
 # entities data (hashtags, urls, mentions)
@@ -3145,6 +3086,8 @@ def capture_status_items(status):
             desc = user_data["description"]
             if desc is not None:
                 captured_status["description"] = ' '.join(desc.split())
+        if "screen_name" in captured_status and "id_str" in captured_status:
+            captured_status["tweet_url"] = "https://twitter.com/" + captured_status["screen_name"] + "/status/" + captured_status["id_str"]
     return captured_status
 
 
