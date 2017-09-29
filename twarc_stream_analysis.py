@@ -2281,83 +2281,111 @@ def dump_interarrivals():
             handle.write(output_string)
             handle.close()
 
+def write_userinfo_csv(category, raw_data, all_users_data):
+    debug_print(sys._getframe().f_code.co_name)
+    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "identifiers_matched", "positive_words", "negative_words", "positive_hashtags", "negative_hashtags", "user_id_str"]
+    total_entries = 0
+    bot_tweets = 0
+    bot_accounts = 0
+    demographic_accounts = 0
+    demographic_tweets = 0
+    filename = "data/custom/userinfo_" + category + ".csv"
+    debug_print("Writing userinfo: " + filename)
+    handle = io.open(filename, 'w', encoding='utf-8')
+    handle.write(u"screen_name, ")
+    handle.write(u", ".join(map(unicode, userinfo_order)) + u"\n")
+    for name, stuff in raw_data.iteritems():
+        total_entries += 1
+        handle.write(unicode(name))
+        for key in userinfo_order:
+            handle.write(u", ")
+            element = ""
+            if key in stuff:
+                if key == "suspiciousness_reasons":
+                    found_bot = False
+                    found_demo = False
+                    for x in stuff[key]:
+                        if "suspicious" in x:
+                            found_demo = True
+                        if "high activity" in x:
+                            found_bot = True
+                    if found_demo == True:
+                        demographic_accounts += 1
+                        record_demographic(name)
+                        if name in all_users_data:
+                            demographic_tweets += int(all_users_data[name])
+                    if found_bot == True:
+                        bot_accounts += 1
+                        record_bot_list(name)
+                        if name in all_users_data:
+                            bot_tweets += int(all_users_data[name])
+                data_type = type(stuff[key])
+                if data_type is IntType:
+                    element = "%.2f" % stuff[key]
+                elif data_type is FloatType:
+                    element = "%.2f" % stuff[key]
+                elif data_type is ListType:
+                    element = u"[" + u"|".join(stuff[key]) + u"]"
+                else:
+                    element = stuff[key]
+                if element is None:
+                    element = 0.00
+                handle.write(unicode(element))
+        handle.write(u"\n")
+    handle.close
+    return total_entries, bot_tweets, bot_accounts, demographic_tweets, demographic_accounts
+
+def write_userinfo_json(category, raw_data):
+    debug_print(sys._getframe().f_code.co_name)
+    filename = "data/raw/userinfo_" + category + ".json"
+    debug_print("Writing userinfo json: " + filename)
+    handle = open(filename, 'w')
+    json.dump(raw_data, handle, indent=4)
+    handle.close()
+
 def dump_userinfo():
     debug_print(sys._getframe().f_code.co_name)
     userinfo_data = get_all_userinfo()
     all_users_data = get_category_data("users", "all_users")
-    if userinfo_data is None:
+    if userinfo_data is None or all_users_data is None:
         return
-    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "identifiers_matched", "positive_words", "negative_words", "positive_hashtags", "negative_hashtags", "user_id_str"]
     num_suspicious = 0
-    bot_tweets = 0
-    num_bots = 0
-    num_demographic = 0
-    demographic_tweets = 0
     num_all_users = 0
-    debug_print("dumping userinfo data")
+    all_users_collected = False
+    total_users = get_counter("users_all_users")
+    tweets_processed = get_counter("tweets_processed")
+    if "all_users" in userinfo_data:
+        if len(userinfo_data["all_users"]) > 0:
+            all_users_collected = True
     for category, raw_data in userinfo_data.iteritems():
         if conf["config"]["dump_userinfo_json"] == True:
-            filename = "data/raw/userinfo_" + category + ".json"
-            debug_print("Writing userinfo json: " + filename)
-            handle = open(filename, 'w')
-            json.dump(raw_data, handle, indent=4)
-            handle.close()
-        filename = "data/custom/userinfo_" + category + ".csv"
-        debug_print("Writing userinfo: " + filename)
-        handle = io.open(filename, 'w', encoding='utf-8')
-        handle.write(u"screen_name, ")
-        handle.write(u", ".join(map(unicode, userinfo_order)) + u"\n")
-        for name, data in raw_data.iteritems():
+            write_userinfo_json(category, raw_data)
+        total_entries, bot_tweets, bot_accounts, demographic_tweets, demographic_accounts = write_userinfo_csv(category, raw_data, all_users_data)
+        set_counter("userinfo_" + category, total_entries)
+        if all_users_collected == True:
             if category == "all_users":
-                num_all_users += 1
-            elif category == "suspicious":
-                num_suspicious += 1
-            handle.write(unicode(name))
-            for key in userinfo_order:
-                handle.write(u", ")
-                element = ""
-                if key in data:
-                    if key == "suspiciousness_reasons":
-                        if "suspicious" in data[key]:
-                            num_demographic += 1
-                            record_demographic(name)
-                            if name in all_users_data:
-                                demographic_tweets += int(all_users_data[name])
-                        if "high activity" in data[key]:
-                            num_bots += 1
-                            record_bot_list(name)
-                            if name in all_users_data:
-                                bot_tweets += int(all_users_data[name])
-                    data_type = type(data[key])
-                    if data_type is IntType:
-                        element = "%.2f" % data[key]
-                    elif data_type is FloatType:
-                        element = "%.2f" % data[key]
-                    elif data_type is ListType:
-                        element = u"[" + u"|".join(data[key]) + u"]"
-                    else:
-                        element = data[key]
-                    if element is None:
-                        element = 0.00
-                    handle.write(unicode(element))
-            handle.write(u"\n")
-        handle.close
+                set_bot_demo_counters(bot_accounts, demographic_accounts, bot_tweets, demographic_tweets, total_users, tweets_processed)
+        else:
+            if category == "suspicious":
+                set_bot_demo_counters(bot_accounts, demographic_accounts, bot_tweets, demographic_tweets, total_users, tweets_processed)
+
+def set_bot_demo_counters(bot_accounts, demographic_accounts, bot_tweets, demographic_tweets, total_users, tweets_processed):
+    debug_print(sys._getframe().f_code.co_name)
     debug_print("calculating bot influence")
-    set_counter("userinfo_suspicious", num_suspicious)
-    set_counter("userinfo_all_users", num_all_users)
-    set_counter("bot_count", num_bots)
-    set_counter("demographic_count", num_demographic)
+    set_counter("bot_accounts", bot_accounts)
+    set_counter("demographic_accounts", demographic_accounts)
     set_counter("bot_tweets", bot_tweets)
     set_counter("demographic_tweets", demographic_tweets)
-    tweets_processed = get_counter("tweets_processed")
-    num_bot_percent = float(float(num_bots)/float(num_all_users))*100
-    num_demo_percent = float(float(num_demographic)/float(num_all_users))*100
-    bot_percent = float(float(bot_tweets)/float(tweets_processed))*100
-    demographic_percent = float(float(demographic_tweets)/float(tweets_processed))*100
-    set_counter("bot_tweet_percentage", bot_percent)
-    set_counter("bot_account_percentage", num_bot_percent)
-    set_counter("demographic_tweet_percentage", demographic_percent)
-    set_counter("demographic_account_percentage", num_demo_percent)
+    if total_users > 0:
+        bot_account_percent = float(float(bot_accounts)/float(total_users))*100
+        demo_account_percent = float(float(demographic_accounts)/float(total_users))*100
+        set_counter("bot_account_percentage", bot_account_percent)
+        set_counter("demographic_account_percentage", demo_account_percent)
+    if tweets_processed > 0:
+        bot_percent = float(float(bot_tweets)/float(tweets_processed))*100
+        demographic_percent = float(float(demographic_tweets)/float(tweets_processed))*100
+        set_counter("bot_tweet_percentage", bot_percent)
+        set_counter("demographic_tweet_percentage", demographic_percent)
 
 def dump_highly_retweeted():
     debug_print(sys._getframe().f_code.co_name)
