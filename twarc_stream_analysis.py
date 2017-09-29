@@ -2936,26 +2936,31 @@ def process_tweet(status):
         if info["tweets_seen"] > min_tweets:
             record_user = True
             info["suspiciousness_reasons"].append("frequent tweets")
+            found_bot = True
     if info["reply_stdev"] > min_stdev:
         info["suspiciousness_score"] += (info["reply_stdev"] * stdev_multiplier)
         info["suspiciousness_reasons"].append("reply interarrival pattern")
         if info["tweets_seen"] > min_tweets:
             record_user = True
             info["suspiciousness_reasons"].append("[frequent replies]")
+            found_bot = True
     if info["retweet_stdev"] > min_stdev:
         info["suspiciousness_score"] += (info["retweet_stdev"] * stdev_multiplier)
         info["suspiciousness_reasons"].append("retweet interarrival pattern")
+        found_bot = True
 
 # Look for high percentage of replies (often used by porn bots, or to hide timeline)
     if info["reply_percent"] > min_percentage:
         if info["tweets_seen"] > min_tweets:
             info["suspiciousness_score"] += info["reply_percent"]
             info["suspiciousness_reasons"].append("high reply percent")
+            found_bot = True
 
 # Look for high retweet percentages
     if info["retweet_percent"] > min_percentage:
         info["suspiciousness_score"] += info["retweet_percent"]
         info["suspiciousness_reasons"].append("high percentage of retweets")
+        found_bot = True
 
 # Look for an abundance of fake news posts
     if info["fake_news_percent"] > min_percentage:
@@ -2985,6 +2990,7 @@ def process_tweet(status):
         if is_source_legit(info["source"]) is False:
             info["suspiciousness_score"] += 100
             info["suspiciousness_reasons"].append("non-legit Twitter client")
+            found_bot = True
 
 # Look for patterns in username
     if "real" in info["name"].lower():
