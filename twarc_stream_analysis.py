@@ -2876,7 +2876,7 @@ def process_tweet(status):
 
 # Did this user publish a suspicious retweet
     if "retweeted_suspicious" in info:
-        info["suspiciousness_score"] += generic_multiplier
+        info["suspiciousness_score"] += generic_multiplier * 5
         info["suspiciousness_reasons"].append("suspicious retweet")
         found_bot = True
 
