@@ -74,6 +74,7 @@ def init_config():
     conf["config"]["log_all_userinfo"] = False
     conf["config"]["log_per_hour_data"] = False
     conf["config"]["log_user_data"] = False
+    conf["config"]["log_metadata"] = False
     conf["config"]["log_interarrivals"] = True
     conf["config"]["log_timeline_data"] = False
     conf["config"]["dump_raw_data"] = False
@@ -937,6 +938,8 @@ def del_interarrival(category, name):
 
 def add_interarrival(category, name, tweet_time):
     debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["log_interarrivals"] == False:
+        return
     if exists_storage_large("interarrivals", "previous_tweeted", name):
         previous_tweet_time = int(get_storage_large("interarrivals", "previous_tweeted", name))
         delta = tweet_time - previous_tweet_time
@@ -946,6 +949,8 @@ def add_interarrival(category, name, tweet_time):
 
 def add_interarrival_stdev(category, name, value):
     debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["log_interarrivals"] == False:
+        return
     return set_storage("interarrival_stdevs", category, name, value)
 
 def get_all_interarrival_stdevs():
@@ -981,8 +986,12 @@ def get_category_previous_seen(category):
 
 def add_data(variable, category, name):
     debug_print(sys._getframe().f_code.co_name)
-    if conf["config"]["log_user_data"] == False:
-        return
+    if variable == "users":
+        if conf["config"]["log_user_data"] == False:
+            return
+    if variable == "metadata":
+        if conf["config"]["log_metadata"] == False:
+            return
     ret = increment_storage_large(variable, category, name)
     handling = "keep"
     if "params" in conf:
@@ -2244,6 +2253,8 @@ def dump_associations():
 
 def dump_interarrivals():
     debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["log_interarrivals"] == False:
+        return
     s = get_all_interarrival_stdevs()
     if s is not None:
         for category, raw_data in s.iteritems():
@@ -2266,7 +2277,7 @@ def dump_userinfo():
     all_users_data = get_category_data("users", "all_users")
     if userinfo_data is None:
         return
-    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "identifiers_matched", "positive_words", "negative_hashtags", "positive_words", "negative_hashtags", "user_id_str"]
+    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "identifiers_matched", "positive_words", "negative_words", "positive_hashtags", "negative_hashtags", "user_id_str"]
     num_suspicious = 0
     bot_tweets = 0
     num_bots = 0
@@ -2373,8 +2384,7 @@ def dump_data():
         dump_heatmap(name)
 
     debug_print("Dumping interarrivals.")
-    if conf["config"]["log_interarrivals"] == True:
-        dump_interarrivals()
+    dump_interarrivals()
 
     debug_print("Dumping heatmap comparison.")
     dump_heatmap_comparison()
@@ -2463,6 +2473,7 @@ def process_tweet(status):
         else:
             info[f] = "Unknown"
     if "source" in info:
+        info["source"] = info["source"].replace(",", " ")
         add_data("metadata", "source", info["source"])
         add_graphing_data("sources", info["name"], info["source"])
     if "retweet_count" in status:
