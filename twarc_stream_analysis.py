@@ -2896,7 +2896,7 @@ def process_tweet(status):
     info["description_matched"] = current_descs
     if len(current_descs) > 0:
         #info["description_matched"] = "[" + "|".join(current_descs) + "]"
-        info["suspiciousness_score"] += len(current_descs) * generic_multiplier * 3
+        info["suspiciousness_score"] += len(current_descs) * generic_multiplier * 2
         info["suspiciousness_reasons"].append("suspicious description words")
         found_demo = True
 
@@ -2904,7 +2904,7 @@ def process_tweet(status):
     info["identifiers_matched"] = current_tweet_idents
     if len(current_tweet_idents) > 0:
         #info["identifiers_matched"] = "[" + "|".join(current_tweet_idents) + "]"
-        info["suspiciousness_score"] += len(current_tweet_idents) * generic_multiplier * 3
+        info["suspiciousness_score"] += len(current_tweet_idents) * generic_multiplier * 2
         info["suspiciousness_reasons"].append("suspicious words in tweets")
         found_demo = True
 
