@@ -77,6 +77,7 @@ def init_config():
     conf["config"]["log_metadata"] = False
     conf["config"]["log_interarrivals"] = True
     conf["config"]["log_timeline_data"] = False
+    conf["config"]["dump_dicts"] = False
     conf["config"]["dump_raw_data"] = False
     conf["config"]["dump_graphs"] = True
     conf["config"]["sanitize_text"] = False
@@ -2197,6 +2198,8 @@ def determine_dump_filename(data_type, category, label):
 
 def dump_dicts(raw_data, data_type, category, label):
     debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["dump_dicts"] == False:
+        return
     if len(raw_data) < 1:
         return
     filename = determine_dump_filename(data_type, category, label)
