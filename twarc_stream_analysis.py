@@ -2284,7 +2284,7 @@ def write_userinfo_csv(category, raw_data, all_users_data):
     if category == "all_users":
         if conf["config"]["log_all_userinfo"] == False:
             return
-    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "account_age_days", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "identifiers_matched", "positive_words", "negative_words", "positive_hashtags", "negative_hashtags", "user_id_str"]
+    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "account_age_days", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "demo_descs", "identifiers_matched", "demo_idents", "positive_words", "negative_words", "positive_hashtags", "negative_hashtags", "user_id_str"]
     total_entries = 0
     bot_tweets = 0
     bot_accounts = 0
@@ -2895,7 +2895,7 @@ def process_tweet(status):
 # Count suspicious description words
     info["description_matched"] = current_descs
     if len(current_descs) > 0:
-        #info["description_matched"] = "[" + "|".join(current_descs) + "]"
+        info["demo_descs"] = len(current_descs)
         info["suspiciousness_score"] += len(current_descs) * generic_multiplier * 2
         info["suspiciousness_reasons"].append("suspicious description words")
         found_demo = True
@@ -2903,7 +2903,7 @@ def process_tweet(status):
 # Count suspicious words in tweet text
     info["identifiers_matched"] = current_tweet_idents
     if len(current_tweet_idents) > 0:
-        #info["identifiers_matched"] = "[" + "|".join(current_tweet_idents) + "]"
+        info["demo_idents"] = len(current_tweet_idents)
         info["suspiciousness_score"] += len(current_tweet_idents) * generic_multiplier * 2
         info["suspiciousness_reasons"].append("suspicious words in tweets")
         found_demo = True
