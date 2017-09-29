@@ -2284,7 +2284,7 @@ def write_userinfo_csv(category, raw_data, all_users_data):
     if category == "all_users":
         if conf["config"]["log_all_userinfo"] == False:
             return
-    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "identifiers_matched", "positive_words", "negative_words", "positive_hashtags", "negative_hashtags", "user_id_str"]
+    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "account_age_days", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "identifiers_matched", "positive_words", "negative_words", "positive_hashtags", "negative_hashtags", "user_id_str"]
     total_entries = 0
     bot_tweets = 0
     bot_accounts = 0
@@ -2601,9 +2601,9 @@ def process_tweet(status):
                 retweeted_user = status["retweeted_user"]
                 min_account_age = 60*60*24*20
                 retweet_unworthiness = 0
-                account_age = None
-                followers = None
-                tweets = None
+                account_age = 0
+                followers = 0
+                tweets = 0
                 if "created_at" in retweeted_user:
                     c = retweeted_user["created_at"]
                     account_age = seconds_since_twarc_time(c)
@@ -3006,12 +3006,6 @@ def process_tweet(status):
     if info["two_way"] > 0:
         info["suspiciousness_reasons"].append("non-zero two_way")
 
-    if found_bot == True:
-        increment_counter("bot_tweets_this_interval")
-
-    if found_demo == True:
-        increment_counter("demographic_tweets_this_interval")
-
     debug_print("Preparing userinfo for " + info["name"])
 
     if conf["config"]["log_all_userinfo"] == True:
@@ -3021,6 +3015,10 @@ def process_tweet(status):
         debug_print("Recording suspiciousness for " + info["name"])
         add_userinfo("suspicious", info["name"], info)
         increment_counter("suspicious_users")
+        if found_bot == True:
+            increment_counter("bot_tweets_this_interval")
+        if found_demo == True:
+            increment_counter("demographic_tweets_this_interval")
 
     info["processing_end_time"] = int(time.time())
     processing_duration = info["processing_end_time"] - info["processing_start_time"]
