@@ -8,4 +8,6 @@ log_metadata = 0
 log_timeline_data = 0
 dump_dicts = 0
 dump_raw_data = 0
+dump_userinfo_json = 0
 dump_graphs = 0
+serialize = 1
