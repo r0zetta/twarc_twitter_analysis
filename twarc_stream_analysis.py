@@ -2283,8 +2283,11 @@ def dump_userinfo():
     num_bots = 0
     num_demographic = 0
     demographic_tweets = 0
+    num_all_users = 0
     debug_print("dumping userinfo data")
     for category, raw_data in userinfo_data.iteritems():
+        if category == "all_users":
+            num_all_users += 1
         filename = "data/custom/userinfo_" + category + ".csv"
         debug_print("Writing userinfo: " + filename)
         handle = io.open(filename, 'w', encoding='utf-8')
@@ -2322,6 +2325,7 @@ def dump_userinfo():
         handle.close
     debug_print("calculating bot influence")
     set_counter("userinfo_suspicious", num_suspicious)
+    set_counter("userinfo_all_users", num_all_users)
     set_counter("bot_count", num_bots)
     set_counter("demographic_count", num_demographic)
     set_counter("bot_tweets", bot_tweets)
