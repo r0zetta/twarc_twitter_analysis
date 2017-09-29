@@ -394,49 +394,47 @@ def get_from_list_data(variable, category, name):
 # Custom storage and wrappers
 #############################
 
-def record_bot_list(name):
+def record_bot_list(name, category):
     debug_print(sys._getframe().f_code.co_name)
     global data
-    if "bot_list" not in data:
-        data["bot_list"] = []
-    if name not in data["bot_list"]:
-        data["bot_list"].append(name)
-
-def get_bot_list():
-    debug_print(sys._getframe().f_code.co_name)
-    if "bot_list" in data:
-        return data["bot_list"]
+    label = "bot_list_" + category
+    if label not in data:
+        data[label] = []
+    if name not in data[label]:
+        data[label].append(name)
 
 def dump_bot_list():
     debug_print(sys._getframe().f_code.co_name)
-    if "bot_list" in data:
-        filename = "data/custom/bots.txt"
-        handle = io.open(filename, "w", encoding='utf-8')
-        for n in data["bot_list"]:
-            handle.write(n + u"\n")
-        handle.close
+    suffixes = ["suspicious", "all_users"]
+    for s in suffixes:
+        label = "bot_list_" + s
+        if label in data:
+            filename = "data/custom/" + label + ".txt"
+            handle = io.open(filename, "w", encoding='utf-8')
+            for n in data[label]:
+                handle.write(n + u"\n")
+            handle.close
 
-def record_demographic(name):
+def record_demographic(name, category):
     debug_print(sys._getframe().f_code.co_name)
     global data
-    if "demographic" not in data:
-        data["demographic"] = []
-    if name not in data["demographic"]:
-        data["demographic"].append(name)
-
-def get_demographic():
-    debug_print(sys._getframe().f_code.co_name)
-    if "demographic" in data:
-        return data["demographic"]
+    label = "demographic_" + category
+    if label not in data:
+        data[label] = []
+    if name not in data[label]:
+        data[label].append(name)
 
 def dump_demographic_list():
     debug_print(sys._getframe().f_code.co_name)
-    if "demographic" in data:
-        filename = "data/custom/demographics.txt"
-        handle = io.open(filename, "w", encoding='utf-8')
-        for n in data["demographic"]:
-            handle.write(n + u"\n")
-        handle.close
+    suffixes = ["suspicious", "all_users"]
+    for s in suffixes:
+        label = "demographic_" + s
+        if label in data:
+            filename = "data/custom/" + label + ".txt"
+            handle = io.open(filename, "w", encoding='utf-8')
+            for n in data[label]:
+                handle.write(n + u"\n")
+            handle.close
 
 def record_demographic_detail(name, desc_words, tweet_words):
     debug_print(sys._getframe().f_code.co_name)
@@ -2314,12 +2312,12 @@ def write_userinfo_csv(category, raw_data, all_users_data):
                             found_bot = True
                     if found_demo == True:
                         demographic_accounts += 1
-                        record_demographic(name)
+                        record_demographic(name, category)
                         if name in all_users_data:
                             demographic_tweets += int(all_users_data[name])
                     if found_bot == True:
                         bot_accounts += 1
-                        record_bot_list(name)
+                        record_bot_list(name, category)
                         if name in all_users_data:
                             bot_tweets += int(all_users_data[name])
                 data_type = type(stuff[key])
