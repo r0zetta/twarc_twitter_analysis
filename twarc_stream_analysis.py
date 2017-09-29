@@ -2286,15 +2286,16 @@ def dump_userinfo():
     num_all_users = 0
     debug_print("dumping userinfo data")
     for category, raw_data in userinfo_data.iteritems():
-        if category == "all_users":
-            num_all_users += 1
         filename = "data/custom/userinfo_" + category + ".csv"
         debug_print("Writing userinfo: " + filename)
         handle = io.open(filename, 'w', encoding='utf-8')
         handle.write(u"screen_name, ")
         handle.write(u", ".join(map(unicode, userinfo_order)) + u"\n")
         for name, data in raw_data.iteritems():
-            num_suspicious += 1
+            if category == "all_users":
+                num_all_users += 1
+            elif category == "suspicious":
+                num_suspicious += 1
             handle.write(unicode(name))
             for key in userinfo_order:
                 handle.write(u", ")
