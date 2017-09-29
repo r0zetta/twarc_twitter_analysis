@@ -2784,6 +2784,9 @@ def process_tweet(status):
                     increment_per_hour(label + "_hashtags", info["datestring"], h)
 
 # Suspiciousness processing here
+    info["links_out_names"] = get_network_data_link("links_out", info["name"])
+    info["links_in_names"] = get_network_data_link("links_in", info["name"])
+    info["two_way_names"] = get_network_data_link("two_way", info["name"])
     info["links_out"] = get_associations("links_out", info["name"])
     info["links_in"] = get_associations("links_in", info["name"])
     info["two_way"] = get_associations("two_way", info["name"])
