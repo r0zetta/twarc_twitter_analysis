@@ -3225,22 +3225,31 @@ def dump_event():
             output += str(queue_length) + " items in the queue.\n"
             active_threads = get_active_threads()
             output += str(active_threads) + " threads active.\n"
-        output += "Processed " + str(get_counter("tweets_processed_this_interval")) + " tweets during the last " + str(processing_time) + " seconds.\n"
+        tweets_seen = get_counter("tweets_processed_this_interval")
+        output += "Processed " + str(tweets_seen) + " tweets during the last " + str(processing_time) + " seconds.\n"
         bots_seen = get_counter("bot_tweets_this_interval")
         bot_tps = 0.0
+        bot_percent = 0.0
         if bots_seen is not None and bots_seen > 0:
-            output += "Bot tweets this interval: " + str(bots_seen)
             bot_tps = float(float(bots_seen)/float(processing_time))
             set_counter("bot_tweets_per_second_this_interval", bot_tps)
+            bot_percent = float(float(bots_seen)/float(tweets_seen))*100
+            set_counter("bot_percent_this_interval", bot_percent)
+            output += "Bot tweets this interval: " + str(bots_seen)
             output += " (" + str("%.2f" % bot_tps) + " tweets per second)."
+            output += " - " + str("%.2f" % bot_percent) + "%"
             output += "\n"
         demo_seen = get_counter("demographic_tweets_this_interval")
         demo_tps = 0.0
+        demo_percent = 0.0
         if demo_seen is not None and demo_seen > 0:
-            output += "Demographic tweets this interval: " + str(demo_seen)
             demo_tps = float(float(demo_seen)/float(processing_time))
             set_counter("demographic_tweets_per_second_this_interval", demo_tps)
+            demo_percent = float(float(demo_seen)/float(tweets_seen))*100
+            set_counter("demographic_percent_this_interval", demo_percent)
+            output += "Demographic tweets this interval: " + str(demo_seen)
             output += " (" + str("%.2f" % demo_tps) + " tweets per second)."
+            output += " - " + str("%.2f" % demo_percent) + "%"
             output += "\n"
         output += "Tweets encountered: " + str(get_counter("tweets_encountered")) + ", captured: " + str(get_counter("tweets_captured")) + ", processed: " + str(get_counter("tweets_processed")) + "\n"
         tps = float(float(get_counter("tweets_processed_this_interval"))/float(processing_time))
@@ -3261,7 +3270,9 @@ def dump_event():
         output += "Current time is: " + current_time_str + "\n\n"
         record_tweet_volume("all_tweets", current_time_str, tps)
         record_tweet_volume("bot_tweets", current_time_str, bot_tps)
+        record_tweet_volume("bot_percent", current_time_str, bot_percent)
         record_tweet_volume("demo_tweets", current_time_str, demo_tps)
+        record_tweet_volume("demo_percent", current_time_str, demo_percent)
         if exists_counter("average_tweets_per_second"):
             old_average = get_counter("average_tweets_per_second")
             new_average = float((float(tps) + float(old_average)) / 2)
