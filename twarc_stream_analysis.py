@@ -3234,7 +3234,7 @@ def dump_event():
         set_counter("tweets_per_second_this_interval", tps)
         output += "Tweets per second: " + str("%.2f" % tps) + "\n"
         set_counter("bot_tweets_this_interval", 0)
-        set_counter("demo_tweets_this_interval", 0)
+        set_counter("demographic_tweets_this_interval", 0)
         set_counter("tweets_processed_this_interval", 0)
         set_counter("previous_dump_time", int(time.time()))
         set_counter("processing_time", processing_time)
