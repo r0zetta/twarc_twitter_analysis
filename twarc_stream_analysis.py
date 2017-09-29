@@ -2283,6 +2283,9 @@ def dump_interarrivals():
 
 def write_userinfo_csv(category, raw_data, all_users_data):
     debug_print(sys._getframe().f_code.co_name)
+    if category == "all_users":
+        if conf["config"]["log_all_userinfo"] == False:
+            return
     userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "identifiers_matched", "positive_words", "negative_words", "positive_hashtags", "negative_hashtags", "user_id_str"]
     total_entries = 0
     bot_tweets = 0
@@ -2337,6 +2340,9 @@ def write_userinfo_csv(category, raw_data, all_users_data):
 
 def write_userinfo_json(category, raw_data):
     debug_print(sys._getframe().f_code.co_name)
+    if category == "all_users":
+        if conf["config"]["log_all_userinfo"] == False:
+            return
     filename = "data/raw/userinfo_" + category + ".json"
     debug_print("Writing userinfo json: " + filename)
     handle = open(filename, 'w')
@@ -2354,38 +2360,34 @@ def dump_userinfo():
     all_users_collected = False
     total_users = get_counter("users_all_users")
     tweets_processed = get_counter("tweets_processed")
-    if "all_users" in userinfo_data:
-        if len(userinfo_data["all_users"]) > 0:
-            all_users_collected = True
+    if conf["config"]["log_all_userinfo"] == True:
+        if "all_users" in userinfo_data:
+            if len(userinfo_data["all_users"]) > 0:
+                all_users_collected = True
     for category, raw_data in userinfo_data.iteritems():
         if conf["config"]["dump_userinfo_json"] == True:
             write_userinfo_json(category, raw_data)
         total_entries, bot_tweets, bot_accounts, demographic_tweets, demographic_accounts = write_userinfo_csv(category, raw_data, all_users_data)
         set_counter("userinfo_" + category, total_entries)
-        if all_users_collected == True:
-            if category == "all_users":
-                set_bot_demo_counters(bot_accounts, demographic_accounts, bot_tweets, demographic_tweets, total_users, tweets_processed)
-        else:
-            if category == "suspicious":
-                set_bot_demo_counters(bot_accounts, demographic_accounts, bot_tweets, demographic_tweets, total_users, tweets_processed)
+        set_bot_demo_counters(category, bot_accounts, demographic_accounts, bot_tweets, demographic_tweets, total_users, tweets_processed)
 
-def set_bot_demo_counters(bot_accounts, demographic_accounts, bot_tweets, demographic_tweets, total_users, tweets_processed):
+def set_bot_demo_counters(category, bot_accounts, demographic_accounts, bot_tweets, demographic_tweets, total_users, tweets_processed):
     debug_print(sys._getframe().f_code.co_name)
     debug_print("calculating bot influence")
-    set_counter("bot_accounts", bot_accounts)
-    set_counter("demographic_accounts", demographic_accounts)
-    set_counter("bot_tweets", bot_tweets)
-    set_counter("demographic_tweets", demographic_tweets)
+    set_counter("bot_accounts_" + category, bot_accounts)
+    set_counter("demographic_accounts_" + category, demographic_accounts)
+    set_counter("bot_tweets_" + category, bot_tweets)
+    set_counter("demographic_tweets_" + category, demographic_tweets)
     if total_users > 0:
         bot_account_percent = float(float(bot_accounts)/float(total_users))*100
         demo_account_percent = float(float(demographic_accounts)/float(total_users))*100
-        set_counter("bot_account_percentage", bot_account_percent)
-        set_counter("demographic_account_percentage", demo_account_percent)
+        set_counter("bot_account_percentage_" + category, bot_account_percent)
+        set_counter("demographic_account_percentage_" + category, demo_account_percent)
     if tweets_processed > 0:
         bot_percent = float(float(bot_tweets)/float(tweets_processed))*100
         demographic_percent = float(float(demographic_tweets)/float(tweets_processed))*100
-        set_counter("bot_tweet_percentage", bot_percent)
-        set_counter("demographic_tweet_percentage", demographic_percent)
+        set_counter("bot_tweet_percentage_" + category, bot_percent)
+        set_counter("demographic_tweet_percentage_" + category, demographic_percent)
 
 def dump_highly_retweeted():
     debug_print(sys._getframe().f_code.co_name)
