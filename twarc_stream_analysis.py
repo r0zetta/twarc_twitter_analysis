@@ -45,7 +45,7 @@ script_start_time_str = ""
 def init_params():
     global conf
     conf["params"] = {}
-    conf["params"]["default_dump_interval"] = 10
+    conf["params"]["default_dump_interval"] = 60
     conf["params"]["config_reload_interval"] = 5
     conf["params"]["serialization_interval"] = 900
     conf["params"]["graph_dump_interval"] = 60
@@ -2295,6 +2295,7 @@ def dump_userinfo():
             handle.write(unicode(name))
             for key in userinfo_order:
                 handle.write(u", ")
+                element = ""
                 if key in data:
                     if key == "suspiciousness_reasons":
                         if "suspicious" in data[key]:
@@ -2309,12 +2310,14 @@ def dump_userinfo():
                                 bot_tweets += int(all_users_data[name])
                     data_type = type(data[key])
                     if data_type is int:
-                        handle.write(unicode(data[key]))
+                        element = "%.2f" % data[key]
                     elif data_type is float:
-                        num_string = "%.2f" % data[key]
-                        handle.write(unicode(num_string))
+                        element = "%.2f" % data[key]
                     else:
-                        handle.write(unicode(data[key]))
+                        element = data[key]
+                    if element is None:
+                        element = 0.00
+                    handle.write(unicode(element))
             handle.write(u"\n")
         handle.close
     debug_print("calculating bot influence")
