@@ -2321,7 +2321,7 @@ def write_userinfo_csv(category, raw_data, all_users_data):
                             suspiciousness_reasons[x] += 1
                         if "suspicious" in x:
                             found_demo = True
-                        if "high activity" in x:
+                        if "high_activity" in x:
                             found_bot = True
                     if found_demo == True:
                         demographic_accounts += 1
