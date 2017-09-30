@@ -2281,6 +2281,7 @@ def dump_interarrivals():
 
 def write_userinfo_csv(category, raw_data, all_users_data):
     debug_print(sys._getframe().f_code.co_name)
+    suspicious_users = []
     if category == "all_users":
         if conf["config"]["log_all_userinfo"] == False:
             return
@@ -2570,6 +2571,8 @@ def process_tweet(status):
     if "in_reply_to_screen_name" in status:
         info["replied_to"] = status["in_reply_to_screen_name"]
         if info["replied_to"] is not None:
+            if exists_data("users", "suspicious", info["replied_to"]) == True:
+                info["interacted_with_suspicious"] = True
             add_graphing_data("replies", info["name"], info["replied_to"])
             add_timeline_data(info["tweet_time_readable"], info["name"], "replied to", info["replied_to"], info["tweet_id"])
             add_data("users", "repliers", info["name"])
@@ -2587,6 +2590,8 @@ def process_tweet(status):
         info["retweeted_name"] = status["retweeted_screen_name"]
         if info["retweeted_name"] is not None:
             add_data("users", "retweeters", info["name"])
+            if exists_data("users", "suspicious", info["retweeted_name"]) == True:
+                info["interacted_with_suspicious"] = True
             retweet_id = ""
             retweet_text = ""
             retweet_url = ""
@@ -2638,6 +2643,8 @@ def process_tweet(status):
     if "quoted_screen_name" in status:
         info["quote_tweeted_name"] = status["quoted_screen_name"]
         if info["quote_tweeted_name"] is not None:
+            if exists_data("users", "suspicious", info["quote_tweeted_name"]) == True:
+                info["interacted_with_suspicious"] = True
             add_graphing_data("quote_tweets", info["name"], info["quote_tweeted_name"])
             add_timeline_data(info["tweet_time_readable"], info["name"], "quote_tweeted", info["quote_tweeted_name"], info["tweet_id"])
 
@@ -2785,6 +2792,8 @@ def process_tweet(status):
         if len(mentions) > 0:
             for m in mentions:
                 if m is not None:
+                    if exists_data("users", "suspicious", m) == True:
+                        info["interacted_with_suspicious"] = True
                     add_data("users", "mentioned", m)
                     add_graphing_data("mentions", info["name"], m)
                     if m not in info["retweeted_name"] and m not in searches:
@@ -2879,6 +2888,11 @@ def process_tweet(status):
         info["suspiciousness_score"] += generic_multiplier * 5
         info["suspiciousness_reasons"].append("suspicious retweet")
         found_bot = True
+
+# Did this user interact with a suspicious user
+    if "interacted_with_suspicious" in info:
+        info["suspiciousness_score"] += generic_multiplier * 3
+        info["suspiciousness_reasons"].append("interacted with suspicious")
 
 # Record demographic data
     current_descs = []
@@ -3020,6 +3034,7 @@ def process_tweet(status):
     if record_user == True:
         debug_print("Recording suspiciousness for " + info["name"])
         add_userinfo("suspicious", info["name"], info)
+        add_data("users", "suspicious", info["name"])
         increment_counter("suspicious_users")
         if found_bot == True:
             increment_counter("bot_tweets_this_interval")
