@@ -530,6 +530,10 @@ def record_suspicious_retweet(text, url, timestamp, id_str, name, retweeted_name
     if text not in data["suspicious_retweets"]:
         data["suspicious_retweets"][text] = {}
         increment_counter("suspiciously_retweeted")
+        print
+        print "New suspicious retweet activity detected"
+        print text
+        print
     if "twtid" not in data["suspicious_retweets"][text]:
         data["suspicious_retweets"][text]["twtid"] = id_str
     if "url" not in data["suspicious_retweets"][text]:
@@ -1595,7 +1599,7 @@ def dump_tweet_to_disk(item):
 
 def add_timeline_data(date, name, action, item, twt_id):
     debug_print(sys._getframe().f_code.co_name)
-    if name in conf["settings"]["monitored_users"]:
+    if name.lower() in conf["settings"]["monitored_users"]:
         filename = "data/custom/timeline_" + name + ".csv"
         write_timeline(filename, date, name, action, item, twt_id)
     if conf["config"]["log_timeline_data"] is True:
