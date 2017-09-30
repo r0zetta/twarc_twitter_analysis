@@ -394,6 +394,14 @@ def get_from_list_data(variable, category, name):
 # Custom storage and wrappers
 #############################
 
+def record_identifier_usage(name, count):
+    debug_print(sys._getframe().f_code.co_name)
+    add_to_storage_large("users", "used_identifiers", name, count)
+
+def get_identifier_usage(name):
+    debug_print(sys._getframe().f_code.co_name)
+    return get_storage_large("users", "used_identifiers", name)
+
 def record_bot_list(name, category):
     debug_print(sys._getframe().f_code.co_name)
     global data
@@ -2285,7 +2293,7 @@ def write_userinfo_csv(category, raw_data, all_users_data):
     if category == "all_users":
         if conf["config"]["log_all_userinfo"] == False:
             return
-    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "account_age_days", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "demo_descs", "identifiers_matched", "demo_idents", "positive_words", "negative_words", "positive_hashtags", "negative_hashtags", "user_id_str"]
+    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "account_age_days", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "demo_descs", "identifiers_matched", "total_identifiers_used", "demo_idents", "positive_words", "negative_words", "positive_hashtags", "negative_hashtags", "user_id_str"]
     total_entries = 0
     bot_tweets = 0
     bot_accounts = 0
@@ -2660,6 +2668,8 @@ def process_tweet(status):
     info["positive_words"] = 0
     info["negative_words"] = 0
     info["tweet_identifier_matches"] = get_tweet_identifier_matches(info["text"])
+    if len(info["tweet_identifier_matches"]) > 0:
+        record_identifier_usage(info["name"], len(info["tweet_identifier_matches"]))
     if conf["config"]["log_words"] is True:
         tokens = strip_stopwords(tokenize(info["text"]), info["lang"])
         if len(tokens) > 0:
@@ -2928,6 +2938,13 @@ def process_tweet(status):
         info["demo_idents"] = len(current_tweet_idents)
         info["suspiciousness_score"] += len(current_tweet_idents) * generic_multiplier * 2
         info["suspiciousness_reasons"].append("suspicious_words_in_tweets")
+        found_demo = True
+
+# Count total identifiers used
+    info["total_identifiers_used"] = get_identifier_usage(info["name"])
+    if info["total_identifiers_used"] > 0:
+        info["suspiciousness_score"] += info["total_identifiers_used"] * 50
+        info["suspiciousness_reasons"].append("frequent_use_of_identifiers")
         found_demo = True
 
 # Look for extremely heavy account activity
