@@ -2281,7 +2281,7 @@ def dump_interarrivals():
 
 def write_userinfo_csv(category, raw_data, all_users_data):
     debug_print(sys._getframe().f_code.co_name)
-    suspicious_users = []
+    suspiciousness_reasons = {}
     if category == "all_users":
         if conf["config"]["log_all_userinfo"] == False:
             return
@@ -2307,6 +2307,10 @@ def write_userinfo_csv(category, raw_data, all_users_data):
                     found_bot = False
                     found_demo = False
                     for x in stuff[key]:
+                        if x not in suspiciousness_reasons:
+                            suspiciousness_reasons[x] = 1
+                        else:
+                            suspiciousness_reasons[x] += 1
                         if "suspicious" in x:
                             found_demo = True
                         if "high activity" in x:
@@ -2335,6 +2339,10 @@ def write_userinfo_csv(category, raw_data, all_users_data):
                 handle.write(unicode(element))
         handle.write(u"\n")
     handle.close
+    for l, c in suspiciousness_reasons.iteritems():
+        l = l.replace(" ", "_")
+        label = "suspiciousness_" + l
+        set_counter(label, c)
     return total_entries, bot_tweets, bot_accounts, demographic_tweets, demographic_accounts
 
 def write_userinfo_json(category, raw_data):
@@ -2881,18 +2889,18 @@ def process_tweet(status):
 # Look for accounts with no description
     if "description" not in status:
         info["suspiciousness_score"] += generic_multiplier
-        info["suspiciousness_reasons"].append("no description")
+        info["suspiciousness_reasons"].append("no_description")
 
 # Did this user publish a suspicious retweet
     if "retweeted_suspicious" in info:
         info["suspiciousness_score"] += generic_multiplier * 5
-        info["suspiciousness_reasons"].append("suspicious retweet")
+        info["suspiciousness_reasons"].append("suspicious_retweet")
         found_bot = True
 
 # Did this user interact with a suspicious user
     if "interacted_with_suspicious" in info:
         info["suspiciousness_score"] += generic_multiplier * 3
-        info["suspiciousness_reasons"].append("interacted with suspicious")
+        info["suspiciousness_reasons"].append("interacted_with_suspicious")
 
 # Record demographic data
     current_descs = []
@@ -2911,7 +2919,7 @@ def process_tweet(status):
     if len(current_descs) > 0:
         info["demo_descs"] = len(current_descs)
         info["suspiciousness_score"] += len(current_descs) * generic_multiplier * 2
-        info["suspiciousness_reasons"].append("suspicious description words")
+        info["suspiciousness_reasons"].append("suspicious_description_words")
         found_demo = True
 
 # Count suspicious words in tweet text
@@ -2919,61 +2927,61 @@ def process_tweet(status):
     if len(current_tweet_idents) > 0:
         info["demo_idents"] = len(current_tweet_idents)
         info["suspiciousness_score"] += len(current_tweet_idents) * generic_multiplier * 2
-        info["suspiciousness_reasons"].append("suspicious words in tweets")
+        info["suspiciousness_reasons"].append("suspicious_words_in_tweets")
         found_demo = True
 
 # Look for extremely heavy account activity
     if info["tweets_per_day"] > min_tweets_per_day:
         info["suspiciousness_score"] += info["tweets_per_day"] - min_tweets_per_day
-        info["suspiciousness_reasons"].append("high activity")
+        info["suspiciousness_reasons"].append("high_activity")
         found_bot = True
 
     if info["account_age_days"] > 0:
         if info["account_age_days"] < min_account_age_days:
             if info["tweets_per_day"] > min_tweets_per_day:
                 info["suspiciousness_score"] += (info["tweets_per_day"] - min_tweets_per_day) * (min_account_age_days - info["account_age_days"])
-                info["suspiciousness_reasons"].append("high activity on new account")
+                info["suspiciousness_reasons"].append("high_activity_on_new_account")
                 found_bot = True
 
 # Look for high activity and low follower count
     if info["followers_count"] < min_followers:
         if info["tweets_per_day"] > min_tweets_per_day:
             info["suspiciousness_score"] += info["tweets_per_day"] - min_tweets_per_day
-            info["suspiciousness_reasons"].append("high activity and low follower count")
+            info["suspiciousness_reasons"].append("high_activity_and_low_follower_count")
             found_bot = True
 
 # Look for bot-like tweet patterns
     if info["interarrival_stdev"] > min_stdev:
         info["suspiciousness_score"] += (info["interarrival_stdev"] * stdev_multiplier)
-        info["suspiciousness_reasons"].append("tweet interarrival pattern")
+        info["suspiciousness_reasons"].append("tweet_interarrival_pattern")
         found_bot = True
         if info["tweets_seen"] > min_tweets:
             record_user = True
-            info["suspiciousness_reasons"].append("frequent tweets")
+            info["suspiciousness_reasons"].append("frequent_tweets")
             found_bot = True
     if info["reply_stdev"] > min_stdev:
         info["suspiciousness_score"] += (info["reply_stdev"] * stdev_multiplier)
-        info["suspiciousness_reasons"].append("reply interarrival pattern")
+        info["suspiciousness_reasons"].append("reply_interarrival_pattern")
         if info["tweets_seen"] > min_tweets:
             record_user = True
-            info["suspiciousness_reasons"].append("[frequent replies]")
+            info["suspiciousness_reasons"].append("[frequent_replies]")
             found_bot = True
     if info["retweet_stdev"] > min_stdev:
         info["suspiciousness_score"] += (info["retweet_stdev"] * stdev_multiplier)
-        info["suspiciousness_reasons"].append("retweet interarrival pattern")
+        info["suspiciousness_reasons"].append("retweet_interarrival_pattern")
         found_bot = True
 
 # Look for high percentage of replies (often used by porn bots, or to hide timeline)
     if info["reply_percent"] > min_percentage:
         if info["tweets_seen"] > min_tweets:
             info["suspiciousness_score"] += info["reply_percent"]
-            info["suspiciousness_reasons"].append("high reply percent")
+            info["suspiciousness_reasons"].append("high_reply_percent")
             found_bot = True
 
 # Look for high retweet percentages
     if info["retweet_percent"] > min_percentage:
         info["suspiciousness_score"] += info["retweet_percent"]
-        info["suspiciousness_reasons"].append("high percentage of retweets")
+        info["suspiciousness_reasons"].append("high_percentage_of_retweets")
         found_bot = True
 
 # Look for an abundance of fake news posts
@@ -2981,7 +2989,7 @@ def process_tweet(status):
         info["suspiciousness_score"] += info["fake_news_percent"]
         if info["tweets_seen"] > min_tweets:
             record_user = True
-            info["suspiciousness_reasons"].append("frequent fake news tweets")
+            info["suspiciousness_reasons"].append("frequent_fake_news_tweets")
 
 # Look for high following, low followers ratios
     if info["followers_count"] > min_followers:
@@ -2989,7 +2997,7 @@ def process_tweet(status):
             info["suspiciousness_score"] += (info["follower_ratio"] * follow_ratio_multiplier)
             if info["tweets_seen"] > min_tweets:
                 record_user = True
-                info["suspiciousness_reasons"].append("follow ratio")
+                info["suspiciousness_reasons"].append("follow_ratio")
 
 # Look for old accounts with zero followers
     if info["account_age_days"] > min_account_age_days:
@@ -3003,13 +3011,13 @@ def process_tweet(status):
     if "source" in info:
         if is_source_legit(info["source"]) is False:
             info["suspiciousness_score"] += 100
-            info["suspiciousness_reasons"].append("non-legit Twitter client")
+            info["suspiciousness_reasons"].append("non-legit_twitter_client")
             found_bot = True
 
 # Look for patterns in username
     if "real" in info["name"].lower():
             info["suspiciousness_score"] += 300
-            info["suspiciousness_reasons"].append("real in username")
+            info["suspiciousness_reasons"].append("real_in_username")
 
     if info["suspiciousness_score"] > suspiciousness_threshold:
         record_user = True
@@ -3017,14 +3025,14 @@ def process_tweet(status):
 # Look for users who's been seen a lot while analysis was running
     if info["tweets_seen"] > crazy_threshold:
         record_user = True
-        info["suspiciousness_reasons"].append("crazy threshold")
+        info["suspiciousness_reasons"].append("crazy_threshold")
 
     if info["suspiciousness_score"] < 1:
         record_user = False
 
 # Not suspicious, but log users with large numbers of interactions
     if info["two_way"] > 0:
-        info["suspiciousness_reasons"].append("non-zero two_way")
+        info["suspiciousness_reasons"].append("non-zero_two_way")
 
     debug_print("Preparing userinfo for " + info["name"])
 
