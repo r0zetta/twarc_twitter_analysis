@@ -468,7 +468,7 @@ def dump_languages_graph():
 
 def dump_chronology_graphs():
     debug_print(sys._getframe().f_code.co_name)
-    lists = ["retweet_heatmap", "reply_heatmap", "tweet_heatmap"]
+    lists = ["retweet_heatmap", "reply_heatmap", "all_tweet_heatmap"]
     for l in lists:
         dump_chronology_graph(l)
 
@@ -572,6 +572,8 @@ def capture_status_items(status):
 # retweet data
     if "retweeted_status" in status:
         orig_tweet = status["retweeted_status"]
+        if "id_str" in orig_tweet:
+            captured_status["retweeted_id"] = orig_tweet["id_str"]
         if "user" in orig_tweet:
             if orig_tweet["user"] is not None:
                 if "screen_name" in orig_tweet["user"]:
@@ -660,6 +662,47 @@ def capture_status_items(status):
 ############################
 # Process captured status
 ############################
+def record_tweet(text, name, tweet_id):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    url = "https://twitter.com/" + name + "/status/" + str(tweet_id)
+    if "tweets" not in data:
+        data["tweets"] = {}
+    if text not in data["tweets"]:
+        data["tweets"][text] = {}
+        data["tweets"][text]["url"] = url
+    if "users_found" not in data:
+        data["users_found"] = []
+    if name not in data["users_found"]:
+        data["users_found"].append(name)
+
+def dump_tweets():
+    debug_print(sys._getframe().f_code.co_name)
+    output = ""
+    if "tweets" in data:
+        for text, stuff in data["tweets"].iteritems():
+            output += text + "\n"
+            output += data["tweets"][text]["url"] + "\n"
+            output += "\n"
+    if len(output) > 0:
+        filename = output_dir + "_tweets.txt"
+        handle = io.open(filename, "w", encoding='utf-8')
+        handle.write(unicode(output))
+        handle.close()
+
+def dump_names():
+    debug_print(sys._getframe().f_code.co_name)
+    output = ""
+    if "users_found" in data:
+        for n in data["users_found"]:
+            output += n + "\n"
+    if len(output) > 0:
+        filename = output_dir + "_names.txt"
+        handle = io.open(filename, "w", encoding='utf-8')
+        handle.write(unicode(output))
+        handle.close()
+
+
 def process_status(status):
     debug_print(sys._getframe().f_code.co_name)
     retweet = False
@@ -667,21 +710,23 @@ def process_status(status):
     if "retweet" in status:
         if status["retweet"] == True:
             retweet = True
-    if "reply" in status:
-        if status["reply"] == True:
-            reply = True
-    if retweet == True:
-        record_per_minute("retweet_heatmap", status)
-        record_chronology("retweeters", status)
-        increment_counter("retweets")
-    elif reply == True:
-        record_per_minute("reply_heatmap", status)
-        record_chronology("repliers", status)
-        increment_counter("replies")
+            record_tweet(status["text"], status["retweeted_screen_name"], status["retweeted_id"])
+            record_per_minute("retweet_heatmap", status)
+            record_chronology("retweeters", status)
+            increment_counter("retweets")
     else:
-        record_per_minute("tweet_heatmap", status)
+        record_tweet(status["text"], status["screen_name"], status["id_str"])
+        record_per_minute("original_tweet_heatmap", status)
         record_chronology("original_tweets", status)
         increment_counter("original_tweets")
+    if "reply" in status:
+        if status["reply"] == True:
+            record_per_minute("reply_heatmap", status)
+            record_chronology("repliers", status)
+            increment_counter("replies")
+    record_per_minute("all_tweet_heatmap", status)
+    record_chronology("all_tweets", status)
+    increment_counter("all_tweets")
 
 ############################
 # Manage all periodic events
@@ -689,9 +734,18 @@ def process_status(status):
 def periodic_events():
     dump_event()
 
+
 ########################
 # Periodically dump data
 ########################
+def dump_all():
+    dump_counters()
+    dump_chronology_graphs()
+    dump_chronology_lists()
+    dump_languages_graph()
+    dump_tweets()
+    dump_names()
+
 def dump_event():
     debug_print(sys._getframe().f_code.co_name)
     global dump_file_handle
@@ -699,10 +753,7 @@ def dump_event():
     if int(time.time()) > get_counter("previous_dump_time") + get_counter("dump_interval"):
         start_time = int(time.time())
         gathering_time = start_time - get_counter("previous_dump_time") - get_counter("dump_interval")
-        dump_counters()
-        dump_chronology_graphs()
-        dump_chronology_lists()
-        dump_languages_graph()
+        dump_all()
         serialize_data()
         end_time = int(time.time())
         processing_time = gathering_time
@@ -787,10 +838,7 @@ if __name__ == '__main__':
                 periodic_events()
             sys.stdout.write("#")
             sys.stdout.flush()
-    dump_counters()
-    dump_languages_graph()
-    dump_chronology_graphs()
-    dump_chronology_lists()
+    dump_all()
     serialize_data()
     print
     print "Done."
