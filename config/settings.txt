@@ -1,7 +1,7 @@
 log_words = 1
 log_network_data = 1
 log_interarrivals = 1
-log_all_userinfo = 1
+log_all_userinfo = 0
 log_per_hour_data = 0
 log_user_data = 1
 log_metadata = 0
@@ -11,3 +11,6 @@ dump_raw_data = 0
 dump_userinfo_json = 0
 dump_graphs = 0
 serialize = 1
+record_sentiment = 0
+sanitize_text = 0
+
