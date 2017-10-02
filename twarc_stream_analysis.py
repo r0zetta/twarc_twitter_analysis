@@ -2628,6 +2628,9 @@ def process_tweet(status):
             info[f] = status[f]
         else:
             info[f] = "Unknown"
+    if "screen_name" in info:
+        if info["screen_name"].lower() in conf["settings"]["monitored_users"]:
+            info["monitored_user"] = True
     if "source" in info:
         info["source"] = info["source"].replace(",", " ")
         add_data("metadata", "source", info["source"])
@@ -2672,7 +2675,7 @@ def process_tweet(status):
                 info["interacted_with_suspicious"] = True
                 increment_suspicious_interactions(info["name"])
                 info["interacted_with_suspicious_count"] = get_suspicious_interactions(info["name"])
-            if info["replied_to"] in conf["settings"]["monitored_users"]:
+            if info["replied_to"].lower() in conf["settings"]["monitored_users"]:
                 info["interacted_with_monitored_user"] = True
                 increment_monitored_interactions(info["name"])
                 info["interacted_with_monitored_count"] = get_monitored_interactions(info["name"])
@@ -2698,7 +2701,7 @@ def process_tweet(status):
                 info["interacted_with_suspicious"] = True
                 increment_suspicious_interactions(info["name"])
                 info["interacted_with_suspicious_count"] = get_suspicious_interactions(info["name"])
-            if info["retweeted_name"] in conf["settings"]["monitored_users"]:
+            if info["retweeted_name"].lower() in conf["settings"]["monitored_users"]:
                 info["interacted_with_monitored_user"] = True
                 increment_monitored_interactions(info["name"])
                 info["interacted_with_monitored_count"] = get_monitored_interactions(info["name"])
@@ -2763,7 +2766,7 @@ def process_tweet(status):
                 info["interacted_with_suspicious"] = True
                 increment_suspicious_interactions(info["name"])
                 info["interacted_with_suspicious_count"] = get_suspicious_interactions(info["name"])
-            if info["quote_tweeted_name"] in conf["settings"]["monitored_users"]:
+            if info["quote_tweeted_name"].lower() in conf["settings"]["monitored_users"]:
                 info["interacted_with_monitored_user"] = True
                 increment_monitored_interactions(info["name"])
                 info["interacted_with_monitored_count"] = get_monitored_interactions(info["name"])
@@ -2921,7 +2924,7 @@ def process_tweet(status):
                         info["interacted_with_suspicious"] = True
                         increment_suspicious_interactions(info["name"])
                         info["interacted_with_suspicious_count"] = get_suspicious_interactions(info["name"])
-                    if m in conf["settings"]["monitored_users"]:
+                    if m.lower() in conf["settings"]["monitored_users"]:
                         info["interacted_with_monitored_user"] = True
                         increment_monitored_interactions(info["name"])
                         info["interacted_with_monitored_count"] = get_monitored_interactions(info["name"])
@@ -3009,6 +3012,12 @@ def process_tweet(status):
     info["suspiciousness_score"] = 0
     record_user = False
     info["suspiciousness_reasons"] = []
+
+# Is this a monitored user
+    if "monitored_user" in info:
+        info["suspiciousness_reasons"].append("monitored_user")
+        record_user = True
+        found_demo = True
 
 # Look for accounts with no description
     if "description" not in status:
