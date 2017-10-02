@@ -82,6 +82,7 @@ def init_config():
     conf["config"]["dump_raw_data"] = False
     conf["config"]["dump_graphs"] = True
     conf["config"]["dump_userinfo_json"] = True
+    conf["config"]["record_sentiment"] = False
     conf["config"]["sanitize_text"] = False
     conf["config"]["serialize"] = True
     return
@@ -557,6 +558,8 @@ def dump_demographic_detail():
 
 def record_sentiment(label, timestamp, value):
     debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["record_sentiment"] == False:
+        return
     sentiment_value = 0
     if exists_counter("sentiment_" + label):
         old_val = get_counter("sentiment_" + label)
@@ -1677,11 +1680,12 @@ def write_timeline(filename, date, name, action, item, twt_id):
     debug_print(sys._getframe().f_code.co_name)
     if not os.path.exists(filename):
         handle = io.open(filename, 'w', encoding='utf-8')
-        handle.write(u"Date, Username, Action, Item, Tweet Id\n")
+        handle.write(u"Date, Username, Action, Item, Tweet Id, URL\n")
         handle.close
     item = item.replace(",", "")
     handle = io.open(filename, 'a', encoding='utf-8')
-    outstr = date.encode('utf-8') + u", " + name.encode('utf-8') + u", " + action.encode('utf-8') + u", " + item + u", " + twt_id.encode('utf-8') + u"\n"
+    tweet_url = "https://twitter.com/" + name + "/status/" + twt_id
+    outstr = date.encode('utf-8') + u", " + name.encode('utf-8') + u", " + action.encode('utf-8') + u", " + item + u", " + twt_id.encode('utf-8') + u", " + tweet_url.encode('utf-8') + u"\n"
     handle.write(outstr)
     handle.close()
 
@@ -1725,6 +1729,8 @@ def dump_line_chart(dirname, filename, title, x_labels, chart_data):
 
 def dump_sentiment_volume_graphs():
     debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["record_sentiment"] == False:
+        return
     labels = get_sentiment_volume_labels()
     for l in labels:
         volume_data = get_sentiment_volumes(l)
@@ -2730,7 +2736,7 @@ def process_tweet(status):
                 if tweets is not None and tweets > 0:
                     retweet_unworthiness += (100/tweets) * 100
                 if ident_count > 0:
-                    retweet_unworthiness += ident_count * 25
+                    retweet_unworthiness += ident_count * 50
                 if retweet_unworthiness >= 300:
                     if "retweet_count" in info:
                         if info["retweet_count"] > 10:
@@ -3207,8 +3213,9 @@ def capture_status_items(status):
     if "lang" in status:
         captured_status["lang"] = status["lang"]
         if status["lang"] == "en":
-            vs = analyzer.polarity_scores(captured_status["text"])
-            captured_status["sentiment"] = vs["compound"]
+            if conf["config"]["record_sentiment"] == True:
+                vs = analyzer.polarity_scores(captured_status["text"])
+                captured_status["sentiment"] = vs["compound"]
     else:
         return
     if "source" in status:
