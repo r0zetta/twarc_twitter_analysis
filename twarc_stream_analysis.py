@@ -46,7 +46,7 @@ script_start_time_str = ""
 def init_params():
     global conf
     conf["params"] = {}
-    conf["params"]["default_dump_interval"] = 10
+    conf["params"]["default_dump_interval"] = 30
     conf["params"]["config_reload_interval"] = 5
     conf["params"]["serialization_interval"] = 900
     conf["params"]["graph_dump_interval"] = 60
@@ -394,6 +394,31 @@ def get_from_list_data(variable, category, name):
 # Custom storage and wrappers
 #############################
 
+def increment_suspicious_interactions(name):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    increment_storage_large("users", "interacted_with_suspicious", name)
+    if "interacted_with_suspicious" not in data:
+        data["interacted_with_suspicious"] = []
+    if name not in data["interacted_with_suspicious"]:
+        data["interacted_with_suspicious"].append(name)
+
+def get_suspicious_interactions(name):
+    debug_print(sys._getframe().f_code.co_name)
+    return get_storage_large("users", "interacted_with_suspicious", name)
+
+def increment_monitored_interactions(name):
+    debug_print(sys._getframe().f_code.co_name)
+    increment_storage_large("users", "interacted_with_monitored", name)
+    if "interacted_with_monitored" not in data:
+        data["interacted_with_monitored"] = []
+    if name not in data["interacted_with_monitored"]:
+        data["interacted_with_monitored"].append(name)
+
+def get_monitored_interactions(name):
+    debug_print(sys._getframe().f_code.co_name)
+    return get_storage_large("users", "interacted_with_monitored", name)
+
 def record_identifier_usage(name, count):
     debug_print(sys._getframe().f_code.co_name)
     add_to_storage_large("users", "used_identifiers", name, count)
@@ -410,6 +435,33 @@ def record_bot_list(name, category):
         data[label] = []
     if name not in data[label]:
         data[label].append(name)
+
+def dump_interacted_with_suspicious():
+    debug_print(sys._getframe().f_code.co_name)
+    filename = "data/custom/interacted_with_suspicious.txt"
+    if "interacted_with_suspicious" in data:
+        handle = io.open(filename, "w", encoding='utf-8')
+        for n in data["interacted_with_suspicious"]:
+            handle.write(n + u"\n")
+        handle.close
+
+def dump_interacted_with_monitored():
+    debug_print(sys._getframe().f_code.co_name)
+    filename = "data/custom/interacted_with_monitored.txt"
+    if "interacted_with_monitored" in data:
+        handle = io.open(filename, "w", encoding='utf-8')
+        for n in data["interacted_with_monitored"]:
+            handle.write(n + u"\n")
+        handle.close
+
+def dump_retweeted_suspicious():
+    debug_print(sys._getframe().f_code.co_name)
+    filename = "data/custom/retweeted_suspicious.txt"
+    if "retweeted_suspicious" in data:
+        handle = io.open(filename, "w", encoding='utf-8')
+        for n in data["retweeted_suspicious"]:
+            handle.write(n + u"\n")
+        handle.close
 
 def dump_bot_list():
     debug_print(sys._getframe().f_code.co_name)
@@ -522,9 +574,18 @@ def record_sentiment(label, timestamp, value):
             record_sentiment_volume(label, timestamp, sentiment_value)
             set_counter(prev_label, current_time)
 
-def record_suspicious_retweet(text, url, timestamp, id_str, name, retweeted_name, account_age, followers, tweets, retweet_count):
+def get_retweeted_suspicious(name):
+    debug_print(sys._getframe().f_code.co_name)
+    return get_storage_large("users", "retweeted_suspicious", name)
+
+def record_suspicious_retweet(text, url, timestamp, id_str, name, retweeted_name, creation_date, account_age, followers, tweets, retweet_count):
     debug_print(sys._getframe().f_code.co_name)
     global data
+    increment_storage_large("users", "retweeted_suspicious", name)
+    if "retweeted_suspicious" not in data:
+        data["retweeted_suspicious"] = []
+    if name not in data["retweeted_suspicious"]:
+        data["retweeted_suspicious"].append(name)
     if "suspicious_retweets" not in data:
         data["suspicious_retweets"] = {}
     if text not in data["suspicious_retweets"]:
@@ -542,6 +603,8 @@ def record_suspicious_retweet(text, url, timestamp, id_str, name, retweeted_name
         data["suspicious_retweets"][text]["retweet_count"] = retweet_count
     if "retweeted_name" not in data["suspicious_retweets"][text]:
         data["suspicious_retweets"][text]["retweeted_name"] = retweeted_name
+    if "creation_date" not in data["suspicious_retweets"][text]:
+        data["suspicious_retweets"][text]["creation_date"] = creation_date
     if "account_age" not in data["suspicious_retweets"][text]:
         data["suspicious_retweets"][text]["account_age"] = account_age
     if "followers" not in data["suspicious_retweets"][text]:
@@ -564,15 +627,16 @@ def dump_suspicious_retweets():
         handle = io.open(filename, "w", encoding='utf-8')
         for tweet, stuff in data["suspicious_retweets"].iteritems():
             handle.write(unicode(tweet) + u"\n")
-            handle.write(u"Tweet ID: " + unicode(stuff["twtid"]) + "\n")
-            handle.write(u"URL: " + unicode(stuff["url"]) + "\n")
-            handle.write(u"Retweeted: " + unicode(stuff["retweeted_name"]) + "\n")
-            handle.write(u"Retweet count: " + unicode(stuff["retweet_count"]) + "\n")
-            handle.write(u"Account age: " + unicode("%.2f"%float(stuff["account_age"]/(60*60*24))) + " days\n")
-            handle.write(u"Followers: " + unicode(stuff["followers"]) + "\n")
-            handle.write(u"Tweets: " + unicode(stuff["tweets"]) + "\n")
+            handle.write(u"Tweet ID: " + unicode(stuff["twtid"]) + u"\n")
+            handle.write(u"URL: " + unicode(stuff["url"]) + u"\n")
+            handle.write(u"Retweeted: " + unicode(stuff["retweeted_name"]) + u"\n")
+            handle.write(u"Retweet count: " + unicode(stuff["retweet_count"]) + u"\n")
+            handle.write(u"Account age: " + unicode("%.2f"%float(stuff["account_age"])) + u" days\n")
+            handle.write(u"Account created: " + unicode(stuff["creation_date"]) + u"\n")
+            handle.write(u"Followers: " + unicode(stuff["followers"]) + u"\n")
+            handle.write(u"Tweets: " + unicode(stuff["tweets"]) + u"\n")
             handle.write(u"Names:\n")
-            handle.write(u", ".join(map(unicode, stuff["names"])) + "\n")
+            handle.write(u", ".join(map(unicode, stuff["names"])) + u"\n")
             handle.write(u"\n")
         handle.close()
 
@@ -1213,6 +1277,9 @@ def twarc_time_to_object(time_string):
 def twarc_time_to_unix(time_string):
     return time_object_to_unix(twarc_time_to_object(time_string))
 
+def seconds_to_days(seconds):
+    return float(float(seconds)/86400.00)
+
 def seconds_since_twarc_time(time_string):
     input_time_unix = int(twarc_time_to_unix(time_string))
     current_time_unix = int(get_utc_unix_time())
@@ -1459,7 +1526,7 @@ def log_stacktrace():
 
 def init_tweet_processor():
     debug_print(sys._getframe().f_code.co_name)
-    directories = ["serialized", "data", "data/heatmaps", "data/custom", "data/raw"]
+    directories = ["serialized", "data", "data/heatmaps", "data/custom", "data/raw", "data/timelines"]
     for dir in directories:
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -1600,10 +1667,10 @@ def dump_tweet_to_disk(item):
 def add_timeline_data(date, name, action, item, twt_id):
     debug_print(sys._getframe().f_code.co_name)
     if name.lower() in conf["settings"]["monitored_users"]:
-        filename = "data/custom/timeline_" + name + ".csv"
+        filename = "data/timelines/timeline_" + name + ".csv"
         write_timeline(filename, date, name, action, item, twt_id)
     if conf["config"]["log_timeline_data"] is True:
-        filename = "data/custom/timeline.csv"
+        filename = "data/timelines/timeline.csv"
         write_timeline(filename, date, name, action, item, twt_id)
 
 def write_timeline(filename, date, name, action, item, twt_id):
@@ -2297,7 +2364,7 @@ def write_userinfo_csv(category, raw_data, all_users_data):
     if category == "all_users":
         if conf["config"]["log_all_userinfo"] == False:
             return
-    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "account_age_days", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "demo_descs", "identifiers_matched", "total_identifiers_used", "demo_idents", "positive_words", "negative_words", "positive_hashtags", "negative_hashtags", "user_id_str"]
+    userinfo_order = ["suspiciousness_reasons", "suspiciousness_score", "account_created_at", "account_age_days", "num_tweets", "tweets_per_day", "tweets_per_hour", "favourites_count", "listed_count", "friends_count", "followers_count", "follower_ratio", "interacted_with_suspicious_count", "interacted_with_monitored_count", "suspicious_retweets", "source", "default_profile", "default_profile_image", "protected", "verified", "links_out", "links_in", "two_way", "interarrival_stdev", "interarrival_av", "reply_stdev", "reply_av", "retweet_stdev", "retweet_av", "tweets_seen", "replies_seen", "reply_percent", "retweets_seen", "retweet_percent", "mentions_seen", "mentioned", "fake_news_seen", "fake_news_percent", "used_hashtags", "description_matched", "demo_descs", "identifiers_matched", "total_identifiers_used", "demo_idents", "positive_words", "negative_words", "positive_hashtags", "negative_hashtags", "user_id_str"]
     total_entries = 0
     bot_tweets = 0
     bot_accounts = 0
@@ -2487,6 +2554,9 @@ def dump_data():
     dump_retweet_spikes()
     dump_suspicious_retweets()
     dump_bot_list()
+    dump_interacted_with_suspicious()
+    dump_interacted_with_monitored()
+    dump_retweeted_suspicious()
     dump_demographic_list()
     dump_demographic_detail()
 
@@ -2593,6 +2663,12 @@ def process_tweet(status):
         if info["replied_to"] is not None:
             if exists_data("users", "suspicious", info["replied_to"]) == True:
                 info["interacted_with_suspicious"] = True
+                increment_suspicious_interactions(info["name"])
+                info["interacted_with_suspicious_count"] = get_suspicious_interactions(info["name"])
+            if info["replied_to"] in conf["settings"]["monitored_users"]:
+                info["interacted_with_monitored_user"] = True
+                increment_monitored_interactions(info["name"])
+                info["interacted_with_monitored_count"] = get_monitored_interactions(info["name"])
             add_graphing_data("replies", info["name"], info["replied_to"])
             add_timeline_data(info["tweet_time_readable"], info["name"], "replied to", info["replied_to"], info["tweet_id"])
             add_data("users", "repliers", info["name"])
@@ -2606,17 +2682,26 @@ def process_tweet(status):
     info["retweeted_name"] = ""
     info["retweet_stdev"] = 0.0
     info["retweet_av"] = 0
+    info["suspicious_retweets"] = get_retweeted_suspicious(info["name"])
     if "retweeted_screen_name" in status:
         info["retweeted_name"] = status["retweeted_screen_name"]
         if info["retweeted_name"] is not None:
             add_data("users", "retweeters", info["name"])
             if exists_data("users", "suspicious", info["retweeted_name"]) == True:
                 info["interacted_with_suspicious"] = True
+                increment_suspicious_interactions(info["name"])
+                info["interacted_with_suspicious_count"] = get_suspicious_interactions(info["name"])
+            if info["retweeted_name"] in conf["settings"]["monitored_users"]:
+                info["interacted_with_monitored_user"] = True
+                increment_monitored_interactions(info["name"])
+                info["interacted_with_monitored_count"] = get_monitored_interactions(info["name"])
             retweet_id = ""
             retweet_text = ""
             retweet_url = ""
+            ident_count = 0
             if "retweet_text" in status:
                 retweet_text = status["retweet_text"]
+                ident_count = len(get_tweet_identifier_matches(retweet_text))
             if "retweet_id_str" in status:
                 retweet_id = status["retweet_id_str"]
             if "retweeted_tweet_url" in status:
@@ -2624,30 +2709,34 @@ def process_tweet(status):
             record_retweet_frequency(retweet_text, retweet_url, info["tweet_time_unix"], retweet_id, info["name"])
             if "retweeted_user" in status:
                 retweeted_user = status["retweeted_user"]
-                min_account_age = 60*60*24*20
                 retweet_unworthiness = 0
-                account_age = 0
+                creation_date = ""
+                account_age = 0.0
                 followers = 0
                 tweets = 0
                 if "created_at" in retweeted_user:
                     c = retweeted_user["created_at"]
-                    account_age = seconds_since_twarc_time(c)
+                    creation_date = c
+                    act_age_seconds = seconds_since_twarc_time(c)
+                    account_age = seconds_to_days(act_age_seconds)
                 if "followers_count" in retweeted_user:
                     followers = retweeted_user["followers_count"]
                 if "statuses_count" in retweeted_user:
                     tweets = retweeted_user["statuses_count"]
-                if account_age is not None and account_age < min_account_age:
-                    retweet_unworthiness += 1
-                if followers is not None and followers < 50:
-                    retweet_unworthiness += 1
-                if tweets is not None and tweets < 50:
-                    retweet_unworthiness += 1
-                if retweet_unworthiness >= 2:
+                if account_age is not None and account_age > 0.0:
+                    retweet_unworthiness += (20/account_age) * 100
+                if followers is not None and followers > 0:
+                    retweet_unworthiness += (50/followers) * 100
+                if tweets is not None and tweets > 0:
+                    retweet_unworthiness += (100/tweets) * 100
+                if ident_count > 0:
+                    retweet_unworthiness += ident_count * 25
+                if retweet_unworthiness >= 300:
                     if "retweet_count" in info:
                         if info["retweet_count"] > 10:
                             info["retweeted_suspicious"] = True
                             if "quote_tweet" not in status:
-                                record_suspicious_retweet(retweet_text, retweet_url, info["tweet_time_unix"], retweet_id, info["name"], info["retweeted_name"], account_age, followers, tweets, info["retweet_count"])
+                                record_suspicious_retweet(retweet_text, retweet_url, info["tweet_time_unix"], retweet_id, info["name"], info["retweeted_name"], creation_date, account_age, followers, tweets, info["retweet_count"])
                                 increment_counter("suspicious_retweets")
             increment_heatmap("retweets", tweet_time_object)
             increment_per_hour("retweeters", info["datestring"], info["name"])
@@ -2665,6 +2754,13 @@ def process_tweet(status):
         if info["quote_tweeted_name"] is not None:
             if exists_data("users", "suspicious", info["quote_tweeted_name"]) == True:
                 info["interacted_with_suspicious"] = True
+                increment_suspicious_interactions(info["name"])
+                info["interacted_with_suspicious_count"] = get_suspicious_interactions(info["name"])
+            if info["quote_tweeted_name"] in conf["settings"]["monitored_users"]:
+                info["interacted_with_monitored_user"] = True
+                increment_monitored_interactions(info["name"])
+                info["interacted_with_monitored_count"] = get_monitored_interactions(info["name"])
+            add_graphing_data("replies", info["name"], info["replied_to"])
             add_graphing_data("quote_tweets", info["name"], info["quote_tweeted_name"])
             add_timeline_data(info["tweet_time_readable"], info["name"], "quote_tweeted", info["quote_tweeted_name"], info["tweet_id"])
 
@@ -2816,6 +2912,13 @@ def process_tweet(status):
                 if m is not None:
                     if exists_data("users", "suspicious", m) == True:
                         info["interacted_with_suspicious"] = True
+                        increment_suspicious_interactions(info["name"])
+                        info["interacted_with_suspicious_count"] = get_suspicious_interactions(info["name"])
+                    if m in conf["settings"]["monitored_users"]:
+                        info["interacted_with_monitored_user"] = True
+                        increment_monitored_interactions(info["name"])
+                        info["interacted_with_monitored_count"] = get_monitored_interactions(info["name"])
+                    add_graphing_data("replies", info["name"], info["replied_to"])
                     add_data("users", "mentioned", m)
                     add_graphing_data("mentions", info["name"], m)
                     if m not in info["retweeted_name"] and m not in searches:
@@ -2912,9 +3015,14 @@ def process_tweet(status):
         found_bot = True
 
 # Did this user interact with a suspicious user
-    if "interacted_with_suspicious" in info:
-        info["suspiciousness_score"] += generic_multiplier * 3
+    if "interacted_with_suspicious_count" in info:
+        info["suspiciousness_score"] += info["interacted_with_suspicious_count"] * 200
         info["suspiciousness_reasons"].append("interacted_with_suspicious")
+
+# Did this user interact with a monitored user
+    if "interacted_with_monitored_count" in info:
+        info["suspiciousness_score"] += info["interacted_with_monitored_count"] * 200
+        info["suspiciousness_reasons"].append("interacted_with_monitored")
 
 # Record demographic data
     current_descs = []
@@ -2940,7 +3048,7 @@ def process_tweet(status):
     info["identifiers_matched"] = current_tweet_idents
     if len(current_tweet_idents) > 0:
         info["demo_idents"] = len(current_tweet_idents)
-        info["suspiciousness_score"] += len(current_tweet_idents) * generic_multiplier * 2
+        info["suspiciousness_score"] += len(current_tweet_idents) * generic_multiplier
         info["suspiciousness_reasons"].append("suspicious_words_in_tweets")
         found_demo = True
 
