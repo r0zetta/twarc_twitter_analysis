@@ -54,6 +54,7 @@ def init_params():
     conf["params"]["min_tweets_for_suspicious"] = 10
     conf["params"]["data_handling"] = "purge"
     conf["params"]["purge_interval"] = 300
+    conf["params"]["suspiciousness_threshold"] = 1000
     conf["params"]["retweet_spike_window"] = 120
     conf["params"]["retweet_spike_minimum"] = 100
     conf["params"]["retweet_spike_per_second_minimum"] = 0.4
@@ -2997,7 +2998,7 @@ def process_tweet(status):
     min_account_age_days = 30
     min_stdev = 3
     crazy_threshold = 500
-    suspiciousness_threshold = 800
+    suspiciousness_threshold = conf["params"]["suspiciousness_threshold"]
     found_bot = False
     found_demo = False
 
