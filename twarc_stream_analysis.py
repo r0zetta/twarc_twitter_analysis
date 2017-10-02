@@ -2724,6 +2724,8 @@ def process_tweet(status):
                 account_age = 0.0
                 followers = 0
                 tweets = 0
+                if "interacted_with_monitored_user" in info:
+                    retweet_unworthiness += 300
                 if "created_at" in retweeted_user:
                     c = retweeted_user["created_at"]
                     creation_date = c
