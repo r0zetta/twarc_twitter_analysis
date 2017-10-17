@@ -16,7 +16,6 @@ def read_account_file(filepath):
     consumer_secret = None
     access_token = None
     access_token_secret = None
-    print "Reading key file: " + filepath
     with io.open(filepath, "r", encoding = "utf-8") as file:
         for line in file:
             if line is not None:
@@ -66,13 +65,9 @@ def get_account_credentials():
     if len(available_accounts) < 1:
         print "No accounts available to sign on with..."
         sys.exit(0)
-    else:
-        print "Found pool of " + str(len(available_accounts)) + " accounts."
-        print available_accounts
 
 # randomly choose an available account to start the stream on
     chosen = random.randint(0, len(available_accounts) - 1)
-    print "Rolling dice... Got " + str(chosen)
     acct_name = available_accounts[chosen]
     consumer_key = accounts[acct_name]["consumer_key"]
     consumer_secret = accounts[acct_name]["consumer_secret"]
