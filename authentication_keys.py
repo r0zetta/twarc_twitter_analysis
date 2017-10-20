@@ -86,6 +86,8 @@ def get_account_sequential():
     available_accounts, accounts = get_valid_accounts()
     acct_name = available_accounts[account_sequence]
     account_sequence += 1
+    if account_sequence > (len(available_accounts) - 1):
+        account_sequence = 0
     consumer_key = accounts[acct_name]["consumer_key"]
     consumer_secret = accounts[acct_name]["consumer_secret"]
     access_token = accounts[acct_name]["access_token"]
