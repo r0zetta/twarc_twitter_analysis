@@ -4,6 +4,8 @@ import io
 import os
 import random
 
+account_sequence = 0
+
 def strip_quotes(string):
     if string[1] == "\"" and string[-1] == "\"":
         return string[1:-1]
@@ -56,8 +58,8 @@ def read_account_keys():
                     accounts[owner]["access_token_secret"] = details[4]
     return accounts
 
-def get_account_credentials():
 # read in accounts from keys directory
+def get_valid_accounts():
     accounts = read_account_keys()
     available_accounts = []
     for name, data in accounts.iteritems():
@@ -65,10 +67,25 @@ def get_account_credentials():
     if len(available_accounts) < 1:
         print "No accounts available to sign on with..."
         sys.exit(0)
+    return available_accounts, accounts
 
+def get_account_credentials():
+    available_accounts, accounts = get_valid_accounts()
 # randomly choose an available account to start the stream on
     chosen = random.randint(0, len(available_accounts) - 1)
     acct_name = available_accounts[chosen]
+    consumer_key = accounts[acct_name]["consumer_key"]
+    consumer_secret = accounts[acct_name]["consumer_secret"]
+    access_token = accounts[acct_name]["access_token"]
+    access_token_secret = accounts[acct_name]["access_token_secret"]
+    return acct_name, consumer_key, consumer_secret, access_token, access_token_secret
+
+def get_account_sequential():
+    global account_sequence
+    print "Account sequence: " + str(account_sequence)
+    available_accounts, accounts = get_valid_accounts()
+    acct_name = available_accounts[account_sequence]
+    account_sequence += 1
     consumer_key = accounts[acct_name]["consumer_key"]
     consumer_secret = accounts[acct_name]["consumer_secret"]
     access_token = accounts[acct_name]["access_token"]
