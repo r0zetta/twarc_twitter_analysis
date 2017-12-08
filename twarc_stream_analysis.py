@@ -1192,28 +1192,20 @@ def get_categories_from_periodic_data(data_type):
 
 def get_top_data_entries(data_set, category, threshold):
     debug_print(sys._getframe().f_code.co_name)
-    variable = get_category_data(data_set, category)
-    c = 0
+    variable = dict(Counter(get_category_data(data_set, category)).most_common(threshold))
     ret = {}
     for tag, count in sorted(variable.items(), key=lambda x:x[1], reverse=True):
-        if c > threshold:
-            break
         if tag not in ret:
             ret[tag] = count
-            c += 1
     return ret
 
 def get_top_periodic_data_entries(data_type, label, threshold):
     debug_print(sys._getframe().f_code.co_name)
-    variable = get_category_from_periodic_data(data_type, label)
-    c = 0
+    variable = dict(Counter(get_category_from_periodic_data(data_type, label)).most_common(threshold))
     ret = {}
     for tag, count in sorted(variable.items(), key=lambda x:x[1], reverse=True):
-        if c > threshold:
-            break
         if tag not in ret:
             ret[tag] = count
-            c += 1
     return ret
 
 def get_category_names_from_periodic_data(data_type):
