@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from collections import Counter
 from twarc import Twarc
 from authentication_keys import get_account_credentials
 from datetime import datetime, date, time, timedelta
@@ -59,7 +60,7 @@ def init_params():
     conf["params"]["retweet_spike_minimum"] = 100
     conf["params"]["retweet_spike_per_second_minimum"] = 0.4
     conf["params"]["tweet_spike_minimum"] = 1.8
-    conf["params"]["time_to_live"] = 8 * 60 * 60
+    conf["params"]["time_to_live"] = 1 * 60 * 60
     conf["params"]["max_to_output"] = 250
     if test is True:
         conf["params"]["graph_dump_interval"] = 15
@@ -83,6 +84,7 @@ def init_config():
     conf["config"]["dump_raw_data"] = False
     conf["config"]["dump_graphs"] = True
     conf["config"]["dump_userinfo_json"] = True
+    conf["config"]["record_all_tweets"] = False
     conf["config"]["record_sentiment"] = False
     conf["config"]["sanitize_text"] = False
     conf["config"]["serialize"] = True
@@ -588,7 +590,7 @@ def record_suspicious_tweet(text, url, timestamp, id_str, name, creation_date, a
     increment_storage_large("users", "tweeted_suspicious", name)
     if "tweeted_suspicious" not in data:
         data["tweeted_suspicious"] = []
-    if name not in data["retweeted_suspicious"]:
+    if name not in data["tweeted_suspicious"]:
         data["tweeted_suspicious"].append(name)
     if "suspicious_tweets" not in data:
         data["suspicious_tweets"] = {}
@@ -1575,6 +1577,9 @@ def cleanup():
     dump_file_handle.close()
     volume_file_handle.close()
     print "Serializing data..."
+    if collect_only == False:
+        print "Dumping data"
+        dump_data()
     serialize_data()
 
 def log_stacktrace():
@@ -1728,6 +1733,15 @@ def dump_tweet_to_disk(item):
         if conf["config"]["dump_raw_data"] == True:
             json.dump(item, dump_file_handle)
             dump_file_handle.write(u"\n")
+    return
+
+def record_tweet_text(tweet):
+    debug_print(sys._getframe().f_code.co_name)
+    global tweet_file_handle
+    if "record_all_tweets" in conf["config"]:
+        if conf["config"]["record_all_tweets"] == True:
+            tweet_file_handle.write(tweet)
+            tweet_file_handle.write(u"\n")
     return
 
 def add_timeline_data(date, name, action, item, twt_id):
@@ -1920,45 +1934,6 @@ def is_graph_printable(name):
         ret = True
     return ret
 
-def dump_overall_object_graphs(data_type):
-    debug_print(sys._getframe().f_code.co_name)
-    data_sets = ["users", "metadata"]
-    current_datestring = get_datestring(data_type, 0)
-    for ds in data_sets:
-        for category in get_categories_from_storage(ds):
-            if is_graph_printable(category) == False:
-                continue
-            top_data = get_top_data_entries(ds, category, 10)
-            top_data_names = []
-            for n, c in sorted(top_data.iteritems()):
-                top_data_names.append(n)
-            for name in top_data_names:
-                chart_labels = []
-                chart_values = []
-                offset = 10
-                while offset >= 0:
-                    chart_item = {}
-                    datestring = get_datestring(data_type, offset)
-                    offset -= 1
-                    label = category + "_" + datestring
-                    variable = get_category_from_periodic_data(data_type, label)
-                    if variable is not None:
-                        chart_labels.append(datestring[-2:])
-                        if name in variable:
-                            chart_values.append(variable[name])
-                        else:
-                            chart_values.append(0)
-                chart = pygal.Line(show_y_guides=False)
-                chart.title = name
-                chart.x_labels = chart_labels
-                chart.add(name, chart_values)
-                dirname = "data/graphs/overall/" + category + "/objects/" + data_type + "/"
-                if not os.path.exists(dirname):
-                    os.makedirs(dirname)
-                name = name.replace("/", "")
-                filename = dirname + name + "_" + current_datestring + ".svg"
-                chart.render_to_file(filename)
-
 def dump_overall_data_graphs(data_type):
     debug_print(sys._getframe().f_code.co_name)
     data_sets = ["users", "metadata"]
@@ -2002,134 +1977,6 @@ def dump_overall_data_graphs(data_type):
                 chart.add(name, mark_list)
             chart.render_to_file(filename)
 
-def dump_periodic_data_graphs(data_type):
-    debug_print(sys._getframe().f_code.co_name)
-    categories = get_categories_from_periodic_data(data_type)
-    top_level_cats = get_category_names_from_periodic_data(data_type)
-    current_datestring = get_datestring(data_type, 0)
-    for cat in top_level_cats:
-        if is_graph_printable(cat) == False:
-            continue
-        current_label = cat + "_" + current_datestring
-        if current_label in categories:
-            top_data = get_top_periodic_data_entries(data_type, current_label, 10)
-            top_data_names = []
-            for n, c in top_data.iteritems():
-                top_data_names.append(n)
-            dirname = "data/graphs/raw/" + cat + "/" + data_type + "/"
-            filename = cat + "_pie_" + current_datestring + ".svg"
-            dump_pie_chart(dirname, filename, current_label, top_data)
-            trend_data = []
-            offset = 10
-            while offset >= 0:
-                trend_item = {}
-                datestring = get_datestring(data_type, offset)
-                label = cat + "_" + datestring
-                offset -= 1
-                if label in categories:
-                    variable = get_category_from_periodic_data(data_type, label)
-                    trend_item["date"] = datestring[-2:]
-                    for name in top_data_names:
-                        if name in variable:
-                            trend_item[name] = variable[name]
-                        else:
-                            trend_item[name] = 0
-                    trend_data.append(trend_item)
-            dirname = "data/graphs/raw/" + cat + "/" + data_type + "/"
-            if not os.path.exists(dirname):
-                os.makedirs(dirname)
-            filename = dirname + cat + "_" + datestring + ".svg"
-            chart = pygal.Bar(show_y_guides=False)
-            chart.x_labels = [x['date'] for x in trend_data]
-            for name in sorted(top_data_names):
-                mark_list = [x[name] for x in trend_data]
-                chart.add(name, mark_list)
-            chart.render_to_file(filename)
-
-def dump_periodic_data_trends(data_type):
-    debug_print(sys._getframe().f_code.co_name)
-    top_level_cats = get_category_names_from_periodic_data(data_type)
-    current_datestring = get_datestring(data_type, 0)
-    for cat in top_level_cats:
-        if is_graph_printable(cat) == False:
-            continue
-        trend_data = calculate_trends(data_type, cat, 10)
-        num_values = 0
-        graph_chart_labels = []
-        graph_chart_items = {}
-        for j in reversed(range(0, 10)):
-            ds = get_datestring(data_type, j)
-            graph_chart_labels.append(ds[-2:])
-        for name, values in sorted(trend_data.iteritems()):
-            num_values = len(values)
-            graph_chart_item = []
-            index = num_values - 1
-            if num_values > 2:
-                plot_data = []
-                while index >= 0:
-                    plot_item = {}
-                    ds = get_datestring(data_type, index)
-                    plot_item["date"] = ds[-2:]
-                    plot_item["value"] = values[index]
-                    if index < 10:
-                        graph_chart_item.append(values[index])
-                    plot_data.append(plot_item)
-                    index -= 1
-                graph_chart_items[name] = graph_chart_item
-                dirname = "data/graphs/trends/" + cat + "/objects/" + data_type + "/"
-                if not os.path.exists(dirname):
-                    os.makedirs(dirname)
-                name = name.replace("/", "")
-                filename = dirname + name + "_" + current_datestring + ".svg"
-                chart = pygal.Line(show_y_guides=False)
-                chart.x_labels = [x['date'] for x in plot_data]
-                chart.add(name, [x['value'] for x in plot_data])
-                chart.render_to_file(filename)
-        dirname = "data/graphs/trends/" + cat + "/" + data_type + "/"
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
-        filename = dirname + cat + "_" + current_datestring + ".svg"
-        graph_chart = pygal.Dot()
-        graph_chart.x_labels = graph_chart_labels
-        for name, vals in sorted(graph_chart_items.iteritems()):
-            graph_chart.add(name, vals)
-        graph_chart.render_to_file(filename)
-
-
-def calculate_trends(data_type, category, threshold):
-    debug_print(sys._getframe().f_code.co_name)
-    categories = get_categories_from_periodic_data(data_type)
-    current_datestring = get_datestring(data_type, 1)
-    current_label = category + "_" + current_datestring
-    trend_values = {}
-    change_percentages = {}
-    if current_label in categories:
-        top_data_names = get_top_periodic_data_entries(data_type, current_label, threshold)
-        baseline_values = {}
-        variable = get_category_from_periodic_data(data_type, current_label)
-        for name in top_data_names:
-            if name in variable:
-                baseline_values[name] = variable[name]
-        for offset in reversed(range(1, 49)):
-            datestring = get_datestring(data_type, offset)
-            label = category + "_" + datestring
-            if label in categories:
-                variable = get_category_from_periodic_data(data_type, label)
-                for name in top_data_names:
-                    if name in variable:
-                        val = variable[name]
-                        base = baseline_values[name]
-                        percent = (float(val)/float(base)) * 100.00
-                        percent = int(percent)
-                        if name not in change_percentages:
-                            change_percentages[name] =[]
-                        change_percentages[name].append(percent)
-        for name in top_data_names:
-            if name in change_percentages:
-                average_percent = get_average(change_percentages[name])
-                trend_values[name] = average_percent
-    return change_percentages
-
 ############################
 # Caching/purging mechanisms
 ############################
@@ -2149,8 +1996,6 @@ def purge_data():
             psdata = get_category_previous_seen(category)
             for name, value in psdata.iteritems():
                 if is_item_purgeable(category, name, value):
-                    if "cache" in handling:
-                        cache_item(category, name)
                     if "purge" in handling:
                         purge_item(category, name)
                         ret += 1
@@ -2195,10 +2040,6 @@ def purge_item(category, name):
         del_interarrival(category, name)
     elif "metadata" in category:
         del_data("metadata", category, name)
-
-def cache_item(category, name):
-    debug_print(sys._getframe().f_code.co_name)
-    # XXX implement
 
 ########################
 # Specific dump routines
@@ -2373,38 +2214,21 @@ def dump_associations():
     filename = "data/custom/associations.csv"
     handle = io.open(filename, "w", encoding='utf-8')
     handle.write(u"Name, Links Out, Links In, Two Way\n")
-    links_out = get_all_associations("links_out")
-    links_in = get_all_associations("links_in")
-    two_way = get_all_associations("two_way")
-    if links_in is not None:
-        links_in_written = 0
-        links_out_written = 0
-        two_way_written = 0
-        for name, count in sorted(links_in.items(), key=lambda x:x[1], reverse=True):
-            if links_in_written > 200 and links_out_written > 200 and two_way_written > 200:
-                break
-            links_in_count = count
-            links_out_count = 0
-            two_way_count = 0
-            if name in links_out:
-                links_out_count = links_out[name]
-            if name in two_way:
-                two_way_count = two_way[name]
-            if links_in_count > conf["params"]["min_top_score"]:
-                if links_in_written <= 200:
-                    handle.write(unicode(name) + u", " + unicode(links_out_count) + u", " + unicode(links_in_count) + u", " + unicode(two_way_count) + u"\n")
-                    links_in_written += 1
-                    continue
-            if links_out_count > conf["params"]["min_top_score"]:
-                if links_out_written <= 200:
-                    handle.write(unicode(name) + u", " + unicode(links_out_count) + u", " + unicode(links_in_count) + u", " + unicode(two_way_count) + u"\n")
-                    links_out_written += 1
-                    continue
-            if two_way_count > conf["params"]["min_top_score"]:
-                if two_way_written <= 200:
-                    handle.write(unicode(name) + u", " + unicode(links_out_count) + u", " + unicode(links_in_count) + u", " + unicode(two_way_count) + u"\n")
-                    two_way_written += 1
-                    continue
+    links_out = dict(Counter(get_all_associations("links_out")).most_common(50))
+    links_in = dict(Counter(get_all_associations("links_in")).most_common(50))
+    two_way = dict(Counter(get_all_associations("two_way")).most_common(50))
+    name_list = list(set(links_out.keys())|set(links_in.keys())|set(two_way.keys()))
+    for name in name_list:
+        links_in_count = 0
+        links_out_count = 0
+        two_way_count = 0
+        if name in links_in:
+            links_in_count = links_in[name]
+        if name in links_out:
+            links_out_count = links_out[name]
+        if name in two_way:
+            two_way_count = two_way[name]
+        handle.write(unicode(name) + u", " + unicode(links_out_count) + u", " + unicode(links_in_count) + u", " + unicode(two_way_count) + u"\n")
     handle.close
 
 def dump_interarrivals():
@@ -2642,9 +2466,6 @@ def dump_graphs():
                 data_types = ["per_hour_data", "per_day_data"]
                 for d in data_types:
                     dump_overall_data_graphs(d)
-                    #dump_periodic_data_trends(d)
-                    #dump_periodic_data_graphs(d)
-                    #dump_overall_object_graphs(d)
 
 
 ###############################
@@ -2673,6 +2494,7 @@ def process_tweet(status):
     if info["lang"] is None or info["name"] is None or info["text"] is None or info["tweet_id"] is None:
         return
 
+    record_tweet_text(info["text"])
     increment_heatmap("all_tweets", tweet_time_object)
     increment_heatmap("tweets_" + info["lang"], tweet_time_object)
     add_timeline_data(info["tweet_time_readable"], info["name"], "tweeted", info["text"], info["tweet_id"])
@@ -2801,7 +2623,7 @@ def process_tweet(status):
                 if "statuses_count" in retweeted_user:
                     tweets = retweeted_user["statuses_count"]
                 if account_age is not None and account_age > 0.0:
-                    retweet_unworthiness += (20/account_age) * 100
+                    retweet_unworthiness += (50/account_age) * 100
                 if followers is not None and followers > 0:
                     retweet_unworthiness += (50/followers) * 100
                 if tweets is not None and tweets > 0:
@@ -3696,6 +3518,7 @@ if __name__ == '__main__':
         restart = False
 
     init_tweet_processor()
+    tweet_file_handle = io.open("data/raw/tweets.txt", "a", encoding="utf-8")
     dump_file_handle = open("data/raw/raw.json", "a")
     volume_file_handle = open("data/_tweet_volumes.txt", "a")
     analyzer = SentimentIntensityAnalyzer()
