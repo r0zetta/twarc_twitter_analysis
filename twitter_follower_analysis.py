@@ -5,6 +5,7 @@ from tweepy import API
 from tweepy import Cursor
 from datetime import datetime, date, time, timedelta
 from authentication_keys import get_account_credentials, get_account_sequential
+from langdetect import detect
 import numpy as np
 import pygal
 from collections import Counter
@@ -14,6 +15,12 @@ import json
 import sys
 import re
 import io
+
+def sort_to_list(dict_data):
+    ret = []
+    for k, v in sorted(dict_data.items(), key=lambda x:x[1], reverse=True):
+        ret.append([k, v])
+    return ret
 
 def twarc_time_to_readable(time_string):
     twarc_format = "%a %b %d %H:%M:%S %Y"
@@ -119,7 +126,7 @@ def get_follower_ids(target):
     print("Target: " + target)
     print("Getting follower ids")
     follower_ids = auth_api.followers_ids(target)
-    filename = target + "_follower_ids.json"
+    filename = os.path.join(save_dir, target + "_follower_ids.json")
     save_json(follower_ids, filename)
     return follower_ids
 
@@ -137,17 +144,75 @@ def get_details_for_batch(batch):
     return users_json
 
 def get_data(target):
-    filename = target + ".json"
+    filename = os.path.join(save_dir, target + ".json")
     follower_ids = get_follower_ids(target)
     batches = create_batches(follower_ids, 100)
     all_data = []
     batch_count = 1
     for b in batches:
-        print("Batch: " + batch_count)
+        print("Batch: " + str(batch_count))
         batch_count += 1
-    all_data += get_details_for_batch(b)
+        all_data += get_details_for_batch(b)
     save_json(all_data, filename)
     return all_data
+
+def analyze_account_names(all_data):
+    descs = []
+    desc_langs = []
+    names = []
+    name_langs = []
+    screen_names = []
+    screen_name_langs = []
+    desc_count = 0
+    no_desc_count = 0
+    iter_count = 0
+    print("Analyzing names, descriptions, etc.")
+    for d in all_data:
+        print(str(iter_count) + "/" + str(len(all_data)))
+        iter_count += 1
+        name = d["name"]
+        names.append(name)
+        name_lang = ""
+        try:
+            name_lang = detect(name)
+        except:
+            name_lang = "Unknown"
+        name_langs.append(name_lang)
+        print(name + " [" + name_lang + "]")
+
+        screen_name = d["screen_name"]
+        screen_names.append(name)
+        screen_name_lang = ""
+        try:
+            screen_name_lang = detect(name)
+        except:
+            screen_name_lang = "Unknown"
+        screen_name_langs.append(screen_name_lang)
+        print(screen_name + " [" + screen_name_lang + "]")
+
+        desc_lang = ""
+        if "description" in d:
+            desc = d["description"]
+            if len(desc) > 0:
+                desc_count += 1
+                descs.append(desc)
+                try:
+                    desc_lang = detect(desc)
+                except:
+                    desc_lang = "Unknown"
+                print(desc + " [" + desc_lang + "]")
+                desc_langs.append(desc_lang)
+            else:
+                print("No description")
+                no_desc_count += 1
+        else:
+            no_desc_count += 1
+    name_lang_breakdown = sort_to_list(Counter(name_langs))
+    screen_name_lang_breakdown = sort_to_list(Counter(screen_name_langs))
+    desc_lang_breakdown = sort_to_list(Counter(desc_langs))
+    print("Had description: " + str(desc_count))
+    print("Had no description: " + str(no_desc_count))
+    return name_lang_breakdown, screen_name_lang_breakdown, desc_lang_breakdown, desc_count, no_desc_count
 
 def get_account_ages(all_data, num_ranges):
     account_ages = {}
@@ -189,20 +254,37 @@ def pretty_print_age_groups(grouped_ages):
     print
     total = 0
     for item in grouped_ages[:20]:
-        print("\t" + str(item[1]) + " followers had and account that was " + item[0] + " days old.")
+        print("\t" + str(item[1]) + " followers had an account that was " + item[0] + " days old.")
         total += item[1]
     print
     print("\tTotal: " + str(total))
     print
     print
 
+def pretty_print_counter(start, middle, end, counter_list):
+    print
+    print
+    print
+    total = 0
+    for item in counter_list:
+        print("\t" + start + " " + str(item[1]) + " " + middle + " " + str(item[0]) + end + ".")
+        total += int(item[1])
+    print
+    print("\tTotal: " + str(total))
+    print
+    print
+
+
 if __name__ == '__main__':
     target = "Haavisto"
+    save_dir = "follower_analysis_" + target
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
     num_ranges = 1000
     if (len(sys.argv) > 1):
         target = str(sys.argv[1])
     all_data = []
-    filename = target + ".json"
+    filename = os.path.join(save_dir, target + ".json")
     if os.path.exists(filename):
         try:
             with open(filename, "r") as f:
@@ -214,12 +296,24 @@ if __name__ == '__main__':
     else:
         print(filename + " didn't exist. Fetching data.")
         all_data = get_data(target)
+
     account_ages, grouped_ages = get_account_ages(all_data, num_ranges)
-    filename = target + "_follower_account_ages.json"
+    filename = os.path.join(save_dir, target + "_follower_account_ages.json")
     save_json(account_ages, filename)
-    filename = target + "_follower_account_ages_grouped.json"
+    filename = os.path.join(save_dir, target + "_follower_account_ages_grouped.json")
     save_json(grouped_ages, filename)
     pretty_print_age_groups(grouped_ages)
+
+    name_lang_breakdown, screen_name_lang_breakdown, desc_lang_breakdown, desc_count, no_desc_count = analyze_account_names(all_data)
+    filename = os.path.join(save_dir, target + "_follower_name_language_breakdown.json")
+    save_json(name_lang_breakdown, filename)
+    filename = os.path.join(save_dir, target + "_follower_screen_name_language_breakdown.json")
+    save_json(screen_name_lang_breakdown, filename)
+    filename = os.path.join(save_dir, target + "_follower_description_language_breakdown.json")
+    save_json(desc_lang_breakdown, filename)
+    pretty_print_counter("", "Twitter names were identified as language", "", name_lang_breakdown)
+    pretty_print_counter("", "Twitter screen names were identified as language", "", screen_name_lang_breakdown)
+    pretty_print_counter("", "Twitter descriptions were identified as language", "", name_lang_breakdown)
 
 
 
