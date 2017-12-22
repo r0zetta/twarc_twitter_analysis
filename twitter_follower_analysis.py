@@ -313,7 +313,7 @@ if __name__ == '__main__':
     save_json(desc_lang_breakdown, filename)
     pretty_print_counter("", "Twitter names were identified as language", "", name_lang_breakdown)
     pretty_print_counter("", "Twitter screen names were identified as language", "", screen_name_lang_breakdown)
-    pretty_print_counter("", "Twitter descriptions were identified as language", "", name_lang_breakdown)
+    pretty_print_counter("", "Twitter descriptions were identified as language", "", desc_lang_breakdown)
 
 
 
