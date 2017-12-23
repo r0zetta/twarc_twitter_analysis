@@ -163,6 +163,9 @@ def analyze_account_names(all_data):
     name_langs = []
     screen_names = []
     screen_name_langs = []
+    desc_data = {}
+    name_data = {}
+    screen_name_data = {}
     desc_count = 0
     no_desc_count = 0
     iter_count = 0
@@ -178,16 +181,26 @@ def analyze_account_names(all_data):
         except:
             name_lang = "Unknown"
         name_langs.append(name_lang)
+        if name_lang not in name_data:
+            name_data[name_lang] = []
+            name_data[name_lang].append(name)
+        else:
+            name_data[name_lang].append(name)
         print(name + " [" + name_lang + "]")
 
         screen_name = d["screen_name"]
         screen_names.append(name)
         screen_name_lang = ""
         try:
-            screen_name_lang = detect(name)
+            screen_name_lang = detect(screen_name)
         except:
             screen_name_lang = "Unknown"
         screen_name_langs.append(screen_name_lang)
+        if screen_name_lang not in screen_name_data:
+            screen_name_data[screen_name_lang] = []
+            screen_name_data[screen_name_lang].append(screen_name)
+        else:
+            screen_name_data[screen_name_lang].append(screen_name)
         print(screen_name + " [" + screen_name_lang + "]")
 
         desc_lang = ""
@@ -202,6 +215,11 @@ def analyze_account_names(all_data):
                     desc_lang = "Unknown"
                 print(desc + " [" + desc_lang + "]")
                 desc_langs.append(desc_lang)
+                if desc_lang not in desc_data:
+                    desc_data[desc_lang] = []
+                    desc_data[desc_lang].append(desc)
+                else:
+                    desc_data[desc_lang].append(desc)
             else:
                 print("No description")
                 no_desc_count += 1
@@ -210,6 +228,14 @@ def analyze_account_names(all_data):
     name_lang_breakdown = sort_to_list(Counter(name_langs))
     screen_name_lang_breakdown = sort_to_list(Counter(screen_name_langs))
     desc_lang_breakdown = sort_to_list(Counter(desc_langs))
+
+    filename = os.path.join(save_dir, target + "_follower_names_by_language.json")
+    save_json(name_data, filename)
+    filename = os.path.join(save_dir, target + "_follower_screen_names_by_language.json")
+    save_json(screen_name_data, filename)
+    filename = os.path.join(save_dir, target + "_follower_descriptions_by_language.json")
+    save_json(desc_data, filename)
+
     print("Had description: " + str(desc_count))
     print("Had no description: " + str(no_desc_count))
     return name_lang_breakdown, screen_name_lang_breakdown, desc_lang_breakdown, desc_count, no_desc_count
@@ -314,9 +340,5 @@ if __name__ == '__main__':
     pretty_print_counter("", "Twitter names were identified as language", "", name_lang_breakdown)
     pretty_print_counter("", "Twitter screen names were identified as language", "", screen_name_lang_breakdown)
     pretty_print_counter("", "Twitter descriptions were identified as language", "", desc_lang_breakdown)
-
-
-
-
 
 
