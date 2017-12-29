@@ -190,7 +190,6 @@ def analyze_account_names(all_data, analyze_lang):
                 name_data[name_lang].append(name)
             else:
                 name_data[name_lang].append(name)
-            print(name + " [" + name_lang + "]")
 
         screen_name = d["screen_name"]
         screen_names.append(name)
@@ -206,7 +205,6 @@ def analyze_account_names(all_data, analyze_lang):
                 screen_name_data[screen_name_lang].append(screen_name)
             else:
                 screen_name_data[screen_name_lang].append(screen_name)
-            print(screen_name + " [" + screen_name_lang + "]")
 
         lc_name = name.lower()
         if lc_name not in lc_names:
@@ -224,7 +222,6 @@ def analyze_account_names(all_data, analyze_lang):
                         desc_lang = detect(desc)
                     except:
                         desc_lang = "Unknown"
-                    print(desc + " [" + desc_lang + "]")
                     desc_langs.append(desc_lang)
                     if desc_lang not in desc_data:
                         desc_data[desc_lang] = []
