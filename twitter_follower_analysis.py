@@ -156,10 +156,11 @@ def get_data(target):
     save_json(all_data, filename)
     return all_data
 
-def analyze_account_names(all_data):
+def analyze_account_names(all_data, analyze_lang):
     descs = []
     desc_langs = []
     names = []
+    lc_names = {}
     name_langs = []
     screen_names = []
     screen_name_langs = []
@@ -171,57 +172,66 @@ def analyze_account_names(all_data):
     iter_count = 0
     print("Analyzing names, descriptions, etc.")
     for d in all_data:
-        print(str(iter_count) + "/" + str(len(all_data)))
+        if iter_count % 500 == 0:
+            print(str(iter_count) + "/" + str(len(all_data)))
         iter_count += 1
+
         name = d["name"]
         names.append(name)
-        name_lang = ""
-        try:
-            name_lang = detect(name)
-        except:
-            name_lang = "Unknown"
-        name_langs.append(name_lang)
-        if name_lang not in name_data:
-            name_data[name_lang] = []
-            name_data[name_lang].append(name)
-        else:
-            name_data[name_lang].append(name)
-        print(name + " [" + name_lang + "]")
+        if analyze_lang == True:
+            name_lang = ""
+            try:
+                name_lang = detect(name)
+            except:
+                name_lang = "Unknown"
+            name_langs.append(name_lang)
+            if name_lang not in name_data:
+                name_data[name_lang] = []
+                name_data[name_lang].append(name)
+            else:
+                name_data[name_lang].append(name)
+            print(name + " [" + name_lang + "]")
 
         screen_name = d["screen_name"]
         screen_names.append(name)
-        screen_name_lang = ""
-        try:
-            screen_name_lang = detect(screen_name)
-        except:
-            screen_name_lang = "Unknown"
-        screen_name_langs.append(screen_name_lang)
-        if screen_name_lang not in screen_name_data:
-            screen_name_data[screen_name_lang] = []
-            screen_name_data[screen_name_lang].append(screen_name)
-        else:
-            screen_name_data[screen_name_lang].append(screen_name)
-        print(screen_name + " [" + screen_name_lang + "]")
+        if analyze_lang == True:
+            screen_name_lang = ""
+            try:
+                screen_name_lang = detect(screen_name)
+            except:
+                screen_name_lang = "Unknown"
+            screen_name_langs.append(screen_name_lang)
+            if screen_name_lang not in screen_name_data:
+                screen_name_data[screen_name_lang] = []
+                screen_name_data[screen_name_lang].append(screen_name)
+            else:
+                screen_name_data[screen_name_lang].append(screen_name)
+            print(screen_name + " [" + screen_name_lang + "]")
 
-        desc_lang = ""
+        lc_name = name.lower()
+        if lc_name not in lc_names:
+            lc_names[lc_name] = []
+        lc_names[lc_name].append(screen_name)
+
         if "description" in d:
             desc = d["description"]
             if len(desc) > 0:
                 desc_count += 1
                 descs.append(desc)
-                try:
-                    desc_lang = detect(desc)
-                except:
-                    desc_lang = "Unknown"
-                print(desc + " [" + desc_lang + "]")
-                desc_langs.append(desc_lang)
-                if desc_lang not in desc_data:
-                    desc_data[desc_lang] = []
-                    desc_data[desc_lang].append(desc)
-                else:
-                    desc_data[desc_lang].append(desc)
+                if analyze_lang == True:
+                    desc_lang = ""
+                    try:
+                        desc_lang = detect(desc)
+                    except:
+                        desc_lang = "Unknown"
+                    print(desc + " [" + desc_lang + "]")
+                    desc_langs.append(desc_lang)
+                    if desc_lang not in desc_data:
+                        desc_data[desc_lang] = []
+                        desc_data[desc_lang].append(desc)
+                    else:
+                        desc_data[desc_lang].append(desc)
             else:
-                print("No description")
                 no_desc_count += 1
         else:
             no_desc_count += 1
@@ -229,37 +239,122 @@ def analyze_account_names(all_data):
     screen_name_lang_breakdown = sort_to_list(Counter(screen_name_langs))
     desc_lang_breakdown = sort_to_list(Counter(desc_langs))
 
-    filename = os.path.join(save_dir, target + "_follower_names_by_language.json")
-    save_json(name_data, filename)
-    filename = os.path.join(save_dir, target + "_follower_screen_names_by_language.json")
-    save_json(screen_name_data, filename)
-    filename = os.path.join(save_dir, target + "_follower_descriptions_by_language.json")
-    save_json(desc_data, filename)
+    lc_names_filtered = {}
+    for name, screen_names in sorted(lc_names.items()):
+        if len(screen_names) > 1:
+            lc_names_filtered[name] = screen_names
+    filename = os.path.join(save_dir, target + "_lowercase_names.json")
+    save_json(lc_names, filename)
+    filename = os.path.join(save_dir, target + "_lowercase_names_filtered.json")
+    save_json(lc_names_filtered, filename)
+    if analyze_lang == True:
+        filename = os.path.join(save_dir, target + "_names_by_language.json")
+        save_json(name_data, filename)
+        filename = os.path.join(save_dir, target + "_screen_names_by_language.json")
+        save_json(screen_name_data, filename)
+        filename = os.path.join(save_dir, target + "_descriptions_by_language.json")
+        save_json(desc_data, filename)
+        filename = os.path.join(save_dir, target + "_name_language_breakdown.json")
+        save_json(name_lang_breakdown, filename)
+        filename = os.path.join(save_dir, target + "_screen_name_language_breakdown.json")
+        save_json(screen_name_lang_breakdown, filename)
+        filename = os.path.join(save_dir, target + "_description_language_breakdown.json")
+        save_json(desc_lang_breakdown, filename)
+        pretty_print_counter("", "Twitter names were identified as language", "", name_lang_breakdown)
+        pretty_print_counter("", "Twitter screen names were identified as language", "", screen_name_lang_breakdown)
+        pretty_print_counter("", "Twitter descriptions were identified as language", "", desc_lang_breakdown)
 
     print("Had description: " + str(desc_count))
     print("Had no description: " + str(no_desc_count))
     return name_lang_breakdown, screen_name_lang_breakdown, desc_lang_breakdown, desc_count, no_desc_count
 
-def get_account_ages(all_data, num_ranges):
-    account_ages = {}
-    max_age = 0
-    blocks = 1000
-    if num_ranges != 0:
-        blocks = num_ranges
-    all_ages = []
+def make_ranges(data_set, data_map, num_ranges=1000):
+    range_counter = Counter(data_set)
+    range_max = max(data_set)
+    range_step = range_max/num_ranges
+    range_counts = []
+    sorted_items = []
+    labels = []
+    for x in range(num_ranges):
+        start_range = x * range_step
+        end_range = x * range_step + range_step
+        label = str(start_range) + " - " + str(end_range)
+        labels.append(label)
+        temp = []
+        for x, y in data_map.iteritems():
+            if x > start_range and x < end_range:
+                for z in y:
+                    temp.append(z)
+        sorted_items.append([label, temp])
+        range_counts.append([label, len(temp)])
+    return labels, sorted_items, range_counts
+
+def get_ranges_for_var(all_data, var_name, num_ranges=1000):
+    val_list = []
+    val_name_map = {}
     for d in all_data:
+        sn = d["screen_name"]
+        val = d[var_name]
+        val_list.append(val)
+        if val not in val_name_map:
+            val_name_map[val] = []
+        val_name_map[val].append(sn)
+    labels, sorted_items, range_counts = make_ranges(val_list, val_name_map, num_ranges)
+    filename = os.path.join(save_dir, target + "_" + var_name + "_name_map.json")
+    save_json(sorted_items, filename)
+    filename = os.path.join(save_dir, target + "_" + var_name + "_ranges.json")
+    save_json(range_counts, filename)
+
+def analyze_activity(all_data, blocks=1000):
+    tpd_list = []
+    tpd_name_map = {}
+    for d in all_data:
+        sn = d["screen_name"]
+        tweets = d["statuses_count"]
         create_date = d["created_at"]
         account_age = seconds_since_twarc_time(create_date)
+        account_age_days = float(account_age / 86400.00)
+        tpd = float(tweets/account_age_days)
+        tpd_list.append(tpd)
+        if tpd not in tpd_name_map:
+            tpd_name_map[tpd] = []
+        tpd_name_map[tpd].append(sn)
+    labels, sorted_items, range_counts = make_ranges(tpd_list, tpd_name_map, blocks)
+    filename = os.path.join(save_dir, target + "_activity_name_map.json")
+    save_json(sorted_items, filename)
+    filename = os.path.join(save_dir, target + "_activity_ranges.json")
+    save_json(range_counts, filename)
+    pretty_print_counter("", "tweeted", "times per day", range_counts)
+
+def get_account_ages(all_data, blocks=1000):
+    account_ages = {}
+    age_name_map = {}
+    all_ages = []
+    for d in all_data:
+        sn = d["screen_name"]
+        create_date = d["created_at"]
+        account_age = seconds_since_twarc_time(create_date)
+        if account_age not in age_name_map:
+            age_name_map[account_age] = []
+        age_name_map[account_age].append(sn)
         all_ages.append(account_age)
-        if account_age > max_age:
-            max_age = account_age
     account_ages = Counter(all_ages)
+    max_age = max(all_ages)
     age_range = max_age/blocks
     labels = []
+    sorted_range_name_map = []
     for x in range(blocks):
-        start_range = seconds_to_days(x * age_range)
-        end_range = seconds_to_days(x * age_range + age_range)
+        start_seconds = x * age_range
+        end_seconds = x * age_range + age_range
+        start_range = seconds_to_days(start_seconds)
+        end_range = seconds_to_days(end_seconds)
         item = "%.2f" % start_range + " - " + "%.2f" % end_range
+        ns = []
+        for age, names in age_name_map.iteritems():
+            if age > start_seconds and age < end_seconds:
+                for n in names:
+                    ns.append(n)
+        sorted_range_name_map.append([item, ns])
         labels.append(item)
     groups = np.arange(0, max_age, age_range)
     grouped_ages = np.digitize(all_ages, groups)
@@ -268,11 +363,89 @@ def get_account_ages(all_data, num_ranges):
     for g, c in sorted(group_counts.items()):
         if g <= len(labels):
             sorted_group_counts.append([labels[g], int(c)])
+    sorted_age_name_map = []
+    for age, names in sorted(age_name_map.items()):
+        sorted_age_name_map.append([age, names])
     sorted_ages = []
     for age, count in sorted(account_ages.items()):
         sorted_ages.append([int(age), int(count)])
-    #dump_bar_chart("age_ranges.svg", "Haavisto followers account ages (days)", labels[:10], sorted_group_counts[:10])
+    filename = os.path.join(save_dir, target + "_age_name_map.json")
+    save_json(sorted_age_name_map, filename)
+    filename = os.path.join(save_dir, target + "_range_name_map.json")
+    save_json(sorted_range_name_map, filename)
+    filename = os.path.join(save_dir, target + "_account_ages.json")
+    save_json(sorted_ages, filename)
+    filename = os.path.join(save_dir, target + "_account_ages_grouped.json")
+    save_json(sorted_group_counts, filename)
+    pretty_print_age_groups(sorted_group_counts)
     return sorted_ages, sorted_group_counts
+
+def find_eggs(all_data):
+    eggs = []
+    non_eggs = []
+    for d in all_data:
+        dpi = d["default_profile_image"]
+        dp = d["default_profile"]
+        sn = d["screen_name"]
+        if dpi == True and dp == True:
+            eggs.append(sn)
+        else:
+            non_eggs.append(sn)
+    filename = os.path.join(save_dir, target + "_egg_followers.json")
+    save_json(eggs, filename)
+    filename = os.path.join(save_dir, target + "_non_egg_followers.json")
+    save_json(non_eggs, filename)
+    print("Found " + str(len(eggs)) + " eggs and " + str(len(non_eggs)) + " non-eggs.")
+    return eggs, non_eggs
+
+def analyze_locations(all_data):
+    locs = []
+    loc_name_map = {}
+    no_loc = []
+    for d in all_data:
+        sn = d["screen_name"]
+        loc = d["location"]
+        if len(loc) > 0:
+            if loc not in loc_name_map:
+                loc_name_map[loc] = []
+            loc_name_map[loc].append(sn)
+            locs.append(loc)
+        else:
+            no_loc.append(sn)
+    sorted_name_map = []
+    for loc, names in sorted(loc_name_map.items()):
+        sorted_name_map.append([loc, names])
+    loc_counts = dict(Counter(locs))
+    filename = os.path.join(save_dir, target + "_locations_counts.json")
+    save_json(loc_counts, filename)
+    filename = os.path.join(save_dir, target + "_locations_name_map.json")
+    save_json(sorted_name_map, filename)
+    filename = os.path.join(save_dir, target + "_no_location.json")
+    save_json(no_loc, filename)
+    print(str(len(locs)) + " users had location set.")
+    print(str(len(no_loc)) + " users didn't have location set.")
+
+def analyze_geo_data(all_data):
+    enabled = []
+    disabled = []
+    name_map = {}
+    for d in all_data:
+        sn = d["screen_name"]
+        geo = d["geo_enabled"]
+        if geo == True:
+            enabled.append(sn)
+            if "status" in d:
+                if "coordinates" in d["status"]:
+                    if d["status"]["coordinates"] is not None:
+                        print d["status"]["coordinates"]
+            if "retweeted_status" in d:
+                if "coordinates" in d["retweeted_status"]:
+                    if d["retweeted_status"]["coordinates"] is not None:
+                        print d["retweeted_status"]["coordinates"]
+        else:
+            disabled.append(sn)
+    print(str(len(enabled)) + " had geo enabled")
+    print(str(len(disabled)) + " had geo disabled")
 
 def pretty_print_age_groups(grouped_ages):
     print
@@ -292,8 +465,8 @@ def pretty_print_counter(start, middle, end, counter_list):
     print
     print
     total = 0
-    for item in counter_list:
-        print("\t" + start + " " + str(item[1]) + " " + middle + " " + str(item[0]) + end + ".")
+    for item in counter_list[:20]:
+        print("\t" + start + " " + str(item[1]) + " " + middle + " " + str(item[0]) + " " + end + ".")
         total += int(item[1])
     print
     print("\tTotal: " + str(total))
@@ -302,11 +475,11 @@ def pretty_print_counter(start, middle, end, counter_list):
 
 
 if __name__ == '__main__':
+    num_ranges = 1000
     target = "Haavisto"
     save_dir = "follower_analysis_" + target
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    num_ranges = 1000
     if (len(sys.argv) > 1):
         target = str(sys.argv[1])
     all_data = []
@@ -323,22 +496,21 @@ if __name__ == '__main__':
         print(filename + " didn't exist. Fetching data.")
         all_data = get_data(target)
 
-    account_ages, grouped_ages = get_account_ages(all_data, num_ranges)
-    filename = os.path.join(save_dir, target + "_follower_account_ages.json")
-    save_json(account_ages, filename)
-    filename = os.path.join(save_dir, target + "_follower_account_ages_grouped.json")
-    save_json(grouped_ages, filename)
-    pretty_print_age_groups(grouped_ages)
+    analyze_lang = True
+    filename = os.path.join(save_dir, target + "_names_by_language.json")
+    if os.path.exists(filename):
+        analyze_lang = False
 
-    name_lang_breakdown, screen_name_lang_breakdown, desc_lang_breakdown, desc_count, no_desc_count = analyze_account_names(all_data)
-    filename = os.path.join(save_dir, target + "_follower_name_language_breakdown.json")
-    save_json(name_lang_breakdown, filename)
-    filename = os.path.join(save_dir, target + "_follower_screen_name_language_breakdown.json")
-    save_json(screen_name_lang_breakdown, filename)
-    filename = os.path.join(save_dir, target + "_follower_description_language_breakdown.json")
-    save_json(desc_lang_breakdown, filename)
-    pretty_print_counter("", "Twitter names were identified as language", "", name_lang_breakdown)
-    pretty_print_counter("", "Twitter screen names were identified as language", "", screen_name_lang_breakdown)
-    pretty_print_counter("", "Twitter descriptions were identified as language", "", desc_lang_breakdown)
+    get_account_ages(all_data, num_ranges)
+    find_eggs(all_data)
+    analyze_account_names(all_data, analyze_lang)
+    analyze_activity(all_data)
+    analyze_locations(all_data)
+    analyze_geo_data(all_data)
+    get_ranges_for_var(all_data, "statuses_count", num_ranges)
+    get_ranges_for_var(all_data, "favourites_count", num_ranges)
+    get_ranges_for_var(all_data, "friends_count", num_ranges)
+    get_ranges_for_var(all_data, "followers_count", num_ranges)
+    get_ranges_for_var(all_data, "listed_count", num_ranges)
 
 
