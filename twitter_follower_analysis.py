@@ -297,6 +297,8 @@ def get_ranges_for_var(all_data, var_name, num_ranges=1000):
             val_name_map[val] = []
         val_name_map[val].append(sn)
     labels, sorted_items, range_counts = make_ranges(val_list, val_name_map, num_ranges)
+    filename = os.path.join(save_dir, target + "_" + var_name + "_abs_name_map.json")
+    save_json(val_name_map, filename)
     filename = os.path.join(save_dir, target + "_" + var_name + "_name_map.json")
     save_json(sorted_items, filename)
     filename = os.path.join(save_dir, target + "_" + var_name + "_ranges.json")
@@ -474,11 +476,11 @@ def pretty_print_counter(start, middle, end, counter_list):
 if __name__ == '__main__':
     num_ranges = 1000
     target = "Haavisto"
+    if (len(sys.argv) > 1):
+        target = str(sys.argv[1])
     save_dir = "follower_analysis_" + target
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    if (len(sys.argv) > 1):
-        target = str(sys.argv[1])
     all_data = []
     filename = os.path.join(save_dir, target + ".json")
     if os.path.exists(filename):
