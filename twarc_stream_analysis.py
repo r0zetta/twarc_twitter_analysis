@@ -1623,8 +1623,8 @@ def reload_settings():
     conf["settings"]["monitored_users"] = list(set(conf["settings"]["good_users"])|set(conf["settings"]["bad_users"]))
     conf["settings"]["url_keywords"] = read_config("config/url_keywords.txt")
     conf["settings"]["monitored_langs"] = read_config("config/languages.txt")
-    conf["settings"]["description_keywords"] = read_config("config/description_keywords.txt")
-    conf["settings"]["tweet_identifiers"] = read_config("config/tweet_identifiers.txt")
+    conf["settings"]["description_keywords"] = read_config_unicode("config/description_keywords.txt")
+    conf["settings"]["tweet_identifiers"] = read_config_unicode("config/tweet_identifiers.txt")
     conf["config"] = read_settings("config/settings.txt")
 
 def get_description_matches(description):
@@ -1657,25 +1657,19 @@ def serialize_variable(variable, filename):
     debug_print(sys._getframe().f_code.co_name)
     serialize_dir = "serialized"
     filename = serialize_dir + "/" + filename + ".json"
-    handle = open(filename, 'w')
-    json.dump(variable, handle, indent=4)
-    handle.close()
-    return
+    with io.open(filename, "w", encoding="utf-8") as f:
+        f.write(unicode(json.dumps(variable, indent=4, ensure_ascii=False)))
 
 def unserialize_variable(varname):
     debug_print(sys._getframe().f_code.co_name)
     serialize_dir = "serialized"
+    ret = None
     if(os.path.exists(serialize_dir)):
         filename = serialize_dir + "/" + varname + ".json"
         if(os.path.exists(filename)):
-            handle = open(filename, 'r')
-            variable = json.load(handle)
-            handle.close()
-            return variable
-        else:
-            return
-    else:
-        return
+            with io.open(filename, "r", encoding="utf-8") as f:
+                ret = json.load(f)
+    return ret
 
 def serialize_data():
     debug_print(sys._getframe().f_code.co_name)
