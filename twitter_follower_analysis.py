@@ -478,7 +478,7 @@ if __name__ == '__main__':
     target = "Haavisto"
     if (len(sys.argv) > 1):
         target = str(sys.argv[1])
-    save_dir = "follower_analysis_" + target
+    save_dir = "captures/followers/follower_analysis_" + target
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     all_data = []

@@ -17,10 +17,13 @@ import re
 import os
 import io
 
+# Add a way to figure out if the account "never sleeps"
+# Total up the columns in heatmap. If the total is less than a specified amount, consider that "sleep"
+
 count = 1
 data = {}
 target = "@r0zetta"
-output_dir = "captures/"
+output_dir = "captures/users/"
 
 def strip_crap(text):
     if len(text) < 1:
