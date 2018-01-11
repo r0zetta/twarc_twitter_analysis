@@ -458,14 +458,20 @@ def get_account_ages(all_data, blocks=1000):
     pretty_print_age_groups(sorted_group_counts)
     return sorted_ages, sorted_group_counts
 
+def is_egg(d):
+    ret = False
+    dpi = d["default_profile_image"]
+    dp = d["default_profile"]
+    if dpi == True and dp == True:
+        ret = True
+    return ret
+
 def find_eggs(all_data):
     eggs = []
     non_eggs = []
     for d in all_data:
-        dpi = d["default_profile_image"]
-        dp = d["default_profile"]
         sn = d["screen_name"]
-        if dpi == True and dp == True:
+        if is_egg(d):
             eggs.append(sn)
         else:
             non_eggs.append(sn)
@@ -525,6 +531,44 @@ def analyze_geo_data(all_data):
     print(str(len(enabled)) + " had geo enabled")
     print(str(len(disabled)) + " had geo disabled")
 
+def is_bot(d):
+    ret = False
+    score = 0
+    egg = is_egg(d)
+    sn = d["screen_name"]
+    bot_name = is_bot_name(sn)
+    tweets = d["statuses_count"]
+    following = d["friends_count"]
+    followers = d["followers_count"]
+    if egg == True:
+        score += 50
+    if bot_name == True:
+        score += 100
+    if following == 21:
+        score += 100
+    if following < 22:
+        score += 50
+    if followers == 0:
+        score += 100 
+    if tweets == 0:
+        score += 100
+    if score > 300:
+        ret = True
+    return ret
+
+def find_bots(all_data):
+    bots = []
+    for d in all_data:
+        sn = d["screen_name"]
+        if is_bot(d):
+            bots.append(sn)
+    print
+    print("Found " + str(len(bots)) + " bots.")
+    if len(bots) > 0:
+        filename = os.path.join(save_dir, target + "_bot_followers.json")
+        save_json(bots, filename)
+    return bots
+
 def pretty_print_age_groups(grouped_ages):
     print
     print
@@ -580,6 +624,7 @@ if __name__ == '__main__':
         analyze_lang = False
 
     get_account_ages(all_data, num_ranges)
+    find_bots(all_data)
     find_eggs(all_data)
     analyze_account_names(all_data, analyze_lang)
     analyze_activity(all_data)
