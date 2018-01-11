@@ -247,8 +247,9 @@ def analyze_account_names(all_data, analyze_lang):
     iter_count = 0
     print("Analyzing names, descriptions, etc.")
     for d in all_data:
-        if iter_count % 500 == 0:
-            print(str(iter_count) + "/" + str(len(all_data)))
+        if analyze_lang == True:
+            if iter_count % 500 == 0:
+                print(str(iter_count) + "/" + str(len(all_data)))
         iter_count += 1
 
         name = d["name"]
@@ -404,7 +405,7 @@ def analyze_activity(all_data, blocks=1000):
     save_json(range_counts, filename)
     pretty_print_counter("", "tweeted", "times per day", range_counts)
 
-def get_account_ages(all_data, blocks=1000):
+def get_account_ages(all_data, label, blocks=1000):
     account_ages = {}
     age_name_map = {}
     all_ages = []
@@ -447,15 +448,15 @@ def get_account_ages(all_data, blocks=1000):
     sorted_ages = []
     for age, count in sorted(account_ages.items()):
         sorted_ages.append([int(age), int(count)])
-    filename = os.path.join(save_dir, target + "_age_name_map.json")
+    filename = os.path.join(save_dir, target + label + "_age_name_map.json")
     save_json(sorted_age_name_map, filename)
-    filename = os.path.join(save_dir, target + "_range_name_map.json")
+    filename = os.path.join(save_dir, target + label + "_range_name_map.json")
     save_json(sorted_range_name_map, filename)
-    filename = os.path.join(save_dir, target + "_account_ages.json")
+    filename = os.path.join(save_dir, target + label + "_account_ages.json")
     save_json(sorted_ages, filename)
-    filename = os.path.join(save_dir, target + "_account_ages_grouped.json")
+    filename = os.path.join(save_dir, target +  label + "_account_ages_grouped.json")
     save_json(sorted_group_counts, filename)
-    pretty_print_age_groups(sorted_group_counts)
+    pretty_print_age_groups(sorted_group_counts, label)
     return sorted_ages, sorted_group_counts
 
 def is_egg(d):
@@ -558,24 +559,31 @@ def is_bot(d):
 
 def find_bots(all_data):
     bots = []
+    new_data = []
     for d in all_data:
         sn = d["screen_name"]
         if is_bot(d):
             bots.append(sn)
+            new_data.append(d)
     print
-    print("Found " + str(len(bots)) + " bots.")
+    print("\tFound " + str(len(bots)) + " bots.")
     if len(bots) > 0:
         filename = os.path.join(save_dir, target + "_bot_followers.json")
         save_json(bots, filename)
+    get_account_ages(new_data, "_bots", blocks=30)
     return bots
 
-def pretty_print_age_groups(grouped_ages):
+def pretty_print_age_groups(grouped_ages, label):
     print
     print
     print
     total = 0
+    if label == "":
+        label = "followers"
+    if label[0] == "_":
+        label = label[1:]
     for item in grouped_ages[:20]:
-        print("\t" + str(item[1]) + " followers had an account that was " + item[0] + " days old.")
+        print("\t" + str(item[1]) + " " + label + " had an account that was " + item[0] + " days old.")
         total += item[1]
     print
     print("\tTotal: " + str(total))
@@ -623,7 +631,7 @@ if __name__ == '__main__':
     if os.path.exists(filename):
         analyze_lang = False
 
-    get_account_ages(all_data, num_ranges)
+    get_account_ages(all_data, "", num_ranges)
     find_bots(all_data)
     find_eggs(all_data)
     analyze_account_names(all_data, analyze_lang)
