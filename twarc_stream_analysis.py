@@ -86,6 +86,7 @@ def init_config():
     conf["config"]["dump_userinfo_json"] = True
     conf["config"]["record_all_tweets"] = False
     conf["config"]["record_sentiment"] = False
+    conf["config"]["record_interactions"] = True
     conf["config"]["sanitize_text"] = False
     conf["config"]["serialize"] = True
     return
@@ -397,6 +398,18 @@ def get_from_list_data(variable, category, name):
 #############################
 # Custom storage and wrappers
 #############################
+
+def record_interaction(target, name, interaction):
+    debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["record_interactions"] == False:
+        return
+    label = interaction + "_" + target
+    increment_storage_large("interactions", label, name)
+
+def get_interaction(target, name, interaction):
+    debug_print(sys._getframe().f_code.co_name)
+    label = interaction + "_" + target
+    return get_storage_large("interactions", label, name)
 
 def increment_monitored_interactions(name, monitored_type):
     debug_print(sys._getframe().f_code.co_name)
@@ -1579,7 +1592,7 @@ def log_stacktrace():
 
 def init_tweet_processor():
     debug_print(sys._getframe().f_code.co_name)
-    directories = ["serialized", "data", "data/heatmaps", "data/custom", "data/raw", "data/timelines"]
+    directories = ["serialized", "data", "data/heatmaps", "data/custom", "data/raw", "data/timelines", "data/interactions"]
     for dir in directories:
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -2187,6 +2200,18 @@ def dump_dicts(raw_data, data_type, category, label):
         handle.write(unicode(count) + "\t" + unicode(tag) +  u"\n")
     handle.close()
 
+def dump_interactions():
+    debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["record_interactions"] == False:
+        return
+    save_dir = os.path.join("data", "interactions")
+    all_interactions = get_all_storage_large("interactions")
+    for category, namelist in all_interactions.iteritems():
+        filename = os.path.join(save_dir, category)
+        with open(filename, "w") as f:
+            for name, count in sorted(namelist.items(), key=lambda x:x[1], reverse=True):
+                f.write(unicode(count) + "\t" + unicode(name) +  u"\n")
+
 def dump_associations():
     debug_print(sys._getframe().f_code.co_name)
     filename = "data/custom/associations.csv"
@@ -2478,6 +2503,7 @@ def dump_data():
     dump_interacted_with_suspicious()
     for label in ["good", "bad", "monitored", "suspicious"]:
         dump_interacted_with_monitored(label)
+    dump_interactions()
     dump_retweeted_suspicious()
     dump_demographic_list()
     dump_demographic_detail()
@@ -2599,14 +2625,17 @@ def process_tweet(status):
             if exists_data("users", "suspicious", info["replied_to"]) == True:
                 info["interacted_with_suspicious"] = True
                 increment_monitored_interactions(info["name"], "suspicious")
+                record_interaction(info["replied_to"], info["name"], "replied_to")
                 info["interacted_with_suspicious_count"] = get_monitored_interactions(info["name"], "suspicious")
             if info["replied_to"].lower() in conf["settings"]["good_users"]:
                 info["interacted_with_good_user"] = True
                 increment_monitored_interactions(info["name"], "good")
+                record_interaction(info["replied_to"], info["name"], "replied_to")
                 info["interacted_with_good_count"] = get_monitored_interactions(info["name"], "good")
             if info["replied_to"].lower() in conf["settings"]["bad_users"]:
                 info["interacted_with_bad_user"] = True
                 increment_monitored_interactions(info["name"], "bad")
+                record_interaction(info["replied_to"], info["name"], "replied_to")
                 info["interacted_with_bad_count"] = get_monitored_interactions(info["name"], "bad")
             add_graphing_data("replies", info["name"], info["replied_to"])
             add_timeline_data(info["tweet_time_readable"], info["name"], "replied to", info["replied_to"], info["tweet_id"])
@@ -2629,14 +2658,17 @@ def process_tweet(status):
             if exists_data("users", "suspicious", info["retweeted_name"]) == True:
                 info["interacted_with_suspicious"] = True
                 increment_monitored_interactions(info["name"], "suspicious")
+                record_interaction(info["retweeted_name"], info["name"], "retweeted")
                 info["interacted_with_suspicious_count"] = get_monitored_interactions(info["name"], "suspicious")
             if info["retweeted_name"].lower() in conf["settings"]["good_users"]:
                 info["interacted_with_good_user"] = True
                 increment_monitored_interactions(info["name"], "good")
+                record_interaction(info["retweeted_name"], info["name"], "retweeted")
                 info["interacted_with_good_count"] = get_monitored_interactions(info["name"], "good")
             if info["retweeted_name"].lower() in conf["settings"]["bad_users"]:
                 info["interacted_with_bad_user"] = True
                 increment_monitored_interactions(info["name"], "bad")
+                record_interaction(info["retweeted_name"], info["name"], "retweeted")
                 info["interacted_with_bad_count"] = get_monitored_interactions(info["name"], "bad")
             retweet_id = ""
             retweet_text = ""
@@ -2700,14 +2732,17 @@ def process_tweet(status):
             if exists_data("users", "suspicious", info["quote_tweeted_name"]) == True:
                 info["interacted_with_suspicious"] = True
                 increment_monitored_interactions(info["name"], "suspicious")
+                record_interaction(info["quote_tweeted_name"], info["name"], "quoted")
                 info["interacted_with_suspicious_count"] = get_monitored_interactions(info["name"], "suspicious")
             if info["quote_tweeted_name"].lower() in conf["settings"]["good_users"]:
                 info["interacted_with_good_user"] = True
                 increment_monitored_interactions(info["name"], "good")
+                record_interaction(info["quote_tweeted_name"], info["name"], "quoted")
                 info["interacted_with_good_count"] = get_monitored_interactions(info["name"], "good")
             if info["quote_tweeted_name"].lower() in conf["settings"]["bad_users"]:
                 info["interacted_with_bad_user"] = True
                 increment_monitored_interactions(info["name"], "bad")
+                record_interaction(info["quote_tweeted_name"], info["name"], "quoted")
                 info["interacted_with_bad_count"] = get_monitored_interactions(info["name"], "bad")
             add_graphing_data("replies", info["name"], info["replied_to"])
             add_graphing_data("quote_tweets", info["name"], info["quote_tweeted_name"])
@@ -2862,14 +2897,17 @@ def process_tweet(status):
                     if exists_data("users", "suspicious", m) == True:
                         info["interacted_with_suspicious"] = True
                         increment_monitored_interactions(info["name"], "suspicious")
+                        record_interaction(m, info["name"], "mentioned")
                         info["interacted_with_suspicious_count"] = get_monitored_interactions(info["name"], "suspicious")
                     if m.lower() in conf["settings"]["good_users"]:
                         info["interacted_with_good_user"] = True
                         increment_monitored_interactions(info["name"], "good")
+                        record_interaction(m, info["name"], "mentioned")
                         info["interacted_with_good_count"] = get_monitored_interactions(info["name"], "good")
                     if m.lower() in conf["settings"]["bad_users"]:
                         info["interacted_with_bad_user"] = True
                         increment_monitored_interactions(info["name"], "bad")
+                        record_interaction(m, info["name"], "mentioned")
                         info["interacted_with_bad_count"] = get_monitored_interactions(info["name"], "bad")
                     add_graphing_data("replies", info["name"], info["replied_to"])
                     add_data("users", "mentioned", m)
