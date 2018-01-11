@@ -440,7 +440,7 @@ def get_account_ages(all_data, label, blocks=1000):
     group_counts = Counter(grouped_ages)
     sorted_group_counts = []
     for g, c in sorted(group_counts.items()):
-        if g <= len(labels):
+        if g < len(labels):
             sorted_group_counts.append([labels[g], int(c)])
     sorted_age_name_map = []
     for age, names in sorted(age_name_map.items()):
