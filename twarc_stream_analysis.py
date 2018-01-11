@@ -1409,6 +1409,80 @@ def get_average(list):
     sum_items = sum(list)
     return float(sum_items/num_items)
 
+def is_bot_name(name):
+    interesting = True
+    if re.search("^([A-Z]?[a-z]{1,})?[\_]?([A-Z]?[a-z]{1,})?[\_]?[0-9]{,9}$", name):
+        interesting = False
+    if re.search("^[\_]{,3}[A-Z]{2,}[\_]{,3}$", name):
+        interesting = False
+    if re.search("^[A-Z]{2}[a-z]{2,}$", name):
+        interesting = False
+    if re.search("^([A-Z][a-z]{1,}){3}[0-9]?$", name):
+        interesting = False
+    if re.search("^[A-Z]{1,}[a-z]{1,}[A-Z]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z]{1,}[a-z]{1,}$", name):
+        interesting = False
+    if re.search("^([A-Z]?[a-z]{1,}[\_]{1,}){1,}[A-Z]?[a-z]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z]{1,}[a-z]{1,}[\_][A-Z][\_][A-Z]{1,}[a-z]{1,}$", name):
+        interesting = False
+    if re.search("^[a-z]{1,}[A-Z][a-z]{1,}[A-Z][a-z]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{1,}[A-Z][a-z]{1,}[A-Z]{1,}$", name):
+        interesting = False
+    if re.search("^([A-Z][\_]){1,}[A-Z][a-z]{1,}$", name):
+        interesting = False
+    if re.search("^[\_][A-Z][a-z]{1,}[\_][A-Z][a-z]{1,}[\_]?$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{1,}[\_][A-Z][\_][A-Z]$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{2,}[0-9][A-Z][a-z]{2,}$", name):
+        interesting = False
+    if re.search("^[A-Z]{1,}[0-9]?$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{1,}[\_][A-Z]$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{1,}[A-Z]{2}[a-z]{1,}$", name):
+        interesting = False
+    if re.search("^[\_]{1,}[a-z]{2,}[\_]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{2,}[\_][A-Z][a-z]{2,}[\_][A-Z]$", name):
+        interesting = False
+    if re.search("^[A-Z]?[a-z]{2,}[0-9]{2}[\_]?[A-Z]?[a-z]{2,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{2,}[A-Z]{1,}[0-9]{,2}$", name):
+        interesting = False
+    if re.search("^[\_][A-Z][a-z]{2,}[A-Z][a-z]{2,}[\_]$", name):
+        interesting = False
+    if re.search("^([A-Z][a-z]{1,}){2,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{2,}[\_][A-Z]{2}$", name):
+        interesting = False
+    if re.search("^[a-z]{3,}[0-9][a-z]{3,}$", name):
+        interesting = False
+    if re.search("^[a-z]{4,}[A-Z]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{3,}[A-Z][0-9]{,9}$", name):
+        interesting = False
+    if re.search("^[A-Z]{2,}[\_][A-Z][a-z]{3,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{3,}[A-Z]{1,3}[a-z]{3,}$", name):
+        interesting = False
+    if re.search("^[A-Z]{3,}[a-z]{3,}[0-9]?$", name):
+        interesting = False
+    if re.search("^[A-Z]?[a-z]{3,}[\_]+$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{3,}[\_][a-z]{3,}[\_][A-Za-z]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z]{2,}[a-z]{3,}[A-Z][a-z]{3,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{2,}[A-Z][a-z]{3,}[\_]?[A-Z]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z]{4,}[0-9]{2,9}$", name):
+        interesting = False
+    return interesting
+
 def strip_crap(text):
     debug_print(sys._getframe().f_code.co_name)
     if len(text) < 1:
@@ -2548,6 +2622,8 @@ def process_tweet(status):
     if info["lang"] is None or info["name"] is None or info["text"] is None or info["tweet_id"] is None:
         return
 
+    if is_bot_name(info["name"]):
+        info["bot_name"] = True
     record_tweet_text(info["text"])
     increment_heatmap("all_tweets", tweet_time_object)
     increment_heatmap("tweets_" + info["lang"], tweet_time_object)
@@ -3020,6 +3096,21 @@ def process_tweet(status):
     if "interacted_with_bad_count" in info:
         info["suspiciousness_score"] += info["interacted_with_bad_count"] * 200
         info["suspiciousness_reasons"].append("interacted_with_bad")
+
+# Does the screen name look like a bot name?
+    if "bot_name" in info:
+        info["suspiciousness_reasons"].append("bot_like_name")
+        info["suspiciousness_score"] += generic_multiplier * 3
+
+# A lot of bots follow exactly 21 accounts
+    if info["followers_count"] == 21:
+        info["suspiciousness_reasons"].append("follows_21")
+        info["suspiciousness_score"] += generic_multiplier * 3
+
+# No followers, following 21, bot-like name == likely bot
+    if info["followers_count"] == 21 and "bot_name" in info and info["friends_count"] == 0:
+        info["suspiciousness_reasons"].append("OVER_9000")
+        info["suspiciousness_score"] += 9000
 
 # Record demographic data
     current_descs = []

@@ -22,6 +22,80 @@ def sort_to_list(dict_data):
         ret.append([k, v])
     return ret
 
+def is_bot_name(name):
+    interesting = True
+    if re.search("^([A-Z]?[a-z]{1,})?[\_]?([A-Z]?[a-z]{1,})?[\_]?[0-9]{,9}$", name):
+        interesting = False
+    if re.search("^[\_]{,3}[A-Z]{2,}[\_]{,3}$", name):
+        interesting = False
+    if re.search("^[A-Z]{2}[a-z]{2,}$", name):
+        interesting = False
+    if re.search("^([A-Z][a-z]{1,}){3}[0-9]?$", name):
+        interesting = False
+    if re.search("^[A-Z]{1,}[a-z]{1,}[A-Z]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z]{1,}[a-z]{1,}$", name):
+        interesting = False
+    if re.search("^([A-Z]?[a-z]{1,}[\_]{1,}){1,}[A-Z]?[a-z]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z]{1,}[a-z]{1,}[\_][A-Z][\_][A-Z]{1,}[a-z]{1,}$", name):
+        interesting = False
+    if re.search("^[a-z]{1,}[A-Z][a-z]{1,}[A-Z][a-z]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{1,}[A-Z][a-z]{1,}[A-Z]{1,}$", name):
+        interesting = False
+    if re.search("^([A-Z][\_]){1,}[A-Z][a-z]{1,}$", name):
+        interesting = False
+    if re.search("^[\_][A-Z][a-z]{1,}[\_][A-Z][a-z]{1,}[\_]?$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{1,}[\_][A-Z][\_][A-Z]$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{2,}[0-9][A-Z][a-z]{2,}$", name):
+        interesting = False
+    if re.search("^[A-Z]{1,}[0-9]?$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{1,}[\_][A-Z]$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{1,}[A-Z]{2}[a-z]{1,}$", name):
+        interesting = False
+    if re.search("^[\_]{1,}[a-z]{2,}[\_]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{2,}[\_][A-Z][a-z]{2,}[\_][A-Z]$", name):
+        interesting = False
+    if re.search("^[A-Z]?[a-z]{2,}[0-9]{2}[\_]?[A-Z]?[a-z]{2,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{2,}[A-Z]{1,}[0-9]{,2}$", name):
+        interesting = False
+    if re.search("^[\_][A-Z][a-z]{2,}[A-Z][a-z]{2,}[\_]$", name):
+        interesting = False
+    if re.search("^([A-Z][a-z]{1,}){2,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{2,}[\_][A-Z]{2}$", name):
+        interesting = False
+    if re.search("^[a-z]{3,}[0-9][a-z]{3,}$", name):
+        interesting = False
+    if re.search("^[a-z]{4,}[A-Z]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{3,}[A-Z][0-9]{,9}$", name):
+        interesting = False
+    if re.search("^[A-Z]{2,}[\_][A-Z][a-z]{3,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{3,}[A-Z]{1,3}[a-z]{3,}$", name):
+        interesting = False
+    if re.search("^[A-Z]{3,}[a-z]{3,}[0-9]?$", name):
+        interesting = False
+    if re.search("^[A-Z]?[a-z]{3,}[\_]+$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{3,}[\_][a-z]{3,}[\_][A-Za-z]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z]{2,}[a-z]{3,}[A-Z][a-z]{3,}$", name):
+        interesting = False
+    if re.search("^[A-Z][a-z]{2,}[A-Z][a-z]{3,}[\_]?[A-Z]{1,}$", name):
+        interesting = False
+    if re.search("^[A-Z]{4,}[0-9]{2,9}$", name):
+        interesting = False
+    return interesting
+
 def twarc_time_to_readable(time_string):
     twarc_format = "%a %b %d %H:%M:%S %Y"
     match_expression = "^(.+)\s(\+[0-9][0-9][0-9][0-9])\s([0-9][0-9][0-9][0-9])$"
@@ -162,6 +236,7 @@ def analyze_account_names(all_data, analyze_lang):
     names = []
     lc_names = {}
     name_langs = []
+    bot_names = []
     screen_names = []
     screen_name_langs = []
     desc_data = {}
@@ -192,7 +267,9 @@ def analyze_account_names(all_data, analyze_lang):
                 name_data[name_lang].append(name)
 
         screen_name = d["screen_name"]
-        screen_names.append(name)
+        screen_names.append(screen_name)
+        if is_bot_name(screen_name):
+            bot_names.append(screen_name)
         if analyze_lang == True:
             screen_name_lang = ""
             try:
@@ -244,6 +321,8 @@ def analyze_account_names(all_data, analyze_lang):
     save_json(lc_names, filename)
     filename = os.path.join(save_dir, target + "_lowercase_names_filtered.json")
     save_json(lc_names_filtered, filename)
+    filename = os.path.join(save_dir, target + "_botlike_names.json")
+    save_json(bot_names, filename)
     if analyze_lang == True:
         filename = os.path.join(save_dir, target + "_names_by_language.json")
         save_json(name_data, filename)
