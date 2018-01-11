@@ -13,5 +13,6 @@ dump_graphs = 0
 record_all_tweets = 0
 serialize = 1
 record_sentiment = 0
+record_interactions = 1
 sanitize_text = 0
 
