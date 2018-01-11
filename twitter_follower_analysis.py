@@ -618,7 +618,7 @@ if __name__ == '__main__':
         print(filename + " didn't exist. Fetching data.")
         all_data = get_data(target)
 
-    analyze_lang = True
+    analyze_lang = False
     filename = os.path.join(save_dir, target + "_names_by_language.json")
     if os.path.exists(filename):
         analyze_lang = False
