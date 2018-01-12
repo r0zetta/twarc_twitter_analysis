@@ -310,6 +310,9 @@ def analyze_account_names(all_data, analyze_lang):
                 no_desc_count += 1
         else:
             no_desc_count += 1
+    filename = os.path.join(save_dir, target + "_screen_names.json")
+    save_json(screen_names, filename)
+
     name_lang_breakdown = sort_to_list(Counter(name_langs))
     screen_name_lang_breakdown = sort_to_list(Counter(screen_name_langs))
     desc_lang_breakdown = sort_to_list(Counter(desc_langs))
