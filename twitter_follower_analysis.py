@@ -16,6 +16,18 @@ import sys
 import re
 import io
 
+def countdown_timer(val):
+    countdown = val
+    step = 1
+    while countdown > 0:
+        msg = "Time left: " + str(countdown)
+        sys.stdout.write(msg)
+        sys.stdout.flush()
+        time.sleep(step)
+        sys.stdout.write("\r")
+        countdown -= step
+    return
+
 def sort_to_list(dict_data):
     ret = []
     for k, v in sorted(dict_data.items(), key=lambda x:x[1], reverse=True):
@@ -444,7 +456,7 @@ def get_account_ages(all_data, label, blocks=1000):
     sorted_group_counts = []
     for g, c in sorted(group_counts.items()):
         if g < len(labels):
-            sorted_group_counts.append([labels[g], int(c)])
+            sorted_group_counts.append([labels[g-1], int(c)])
     sorted_age_name_map = []
     for age, names in sorted(age_name_map.items()):
         sorted_age_name_map.append([age, names])
@@ -576,6 +588,21 @@ def find_bots(all_data):
     get_account_ages(new_data, "_bots", blocks=30)
     return bots
 
+def print_count_map(all_json, var_name):
+    count_map = {}
+    print
+    print
+    print("\t" + var_name + ":")
+    print
+    for a in all_json:
+        val = a[var_name]
+        if val not in count_map:
+            count_map[val] = 0
+        else:
+            count_map[val] += 1
+    for x, y in sorted(count_map.items()):
+        print("\t" + str(x) + "\t" + str(y))
+
 def pretty_print_age_groups(grouped_ages, label):
     print
     print
@@ -609,42 +636,55 @@ def pretty_print_counter(start, middle, end, counter_list):
 
 if __name__ == '__main__':
     num_ranges = 1000
-    target = "Haavisto"
+    input_file = "config/accounts.txt"
+    account_list = ["r0zetta"]
     if (len(sys.argv) > 1):
-        target = str(sys.argv[1])
-    save_dir = "captures/followers/follower_analysis_" + target
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    all_data = []
-    filename = os.path.join(save_dir, target + ".json")
-    if os.path.exists(filename):
-        try:
-            with open(filename, "r") as f:
-                all_data = json.load(f)
-            print("Loaded data from " + filename + ".")
-        except:
-            print("Couldn't load " + filename + ". Fetching data.")
+        account_list = sys.argv[1:]
+    elif os.path.exists(input_file):
+        account_list = []
+        with open(input_file, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                account_list.append(line.strip())
+
+    for target in account_list:
+        print("Analyzing: " + target)
+        save_dir = "captures/followers/follower_analysis_" + target
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        all_data = []
+        filename = os.path.join(save_dir, target + ".json")
+        if os.path.exists(filename):
+            try:
+                with open(filename, "r") as f:
+                    all_data = json.load(f)
+                print("Loaded data from " + filename + ".")
+            except:
+                print("Couldn't load " + filename + ". Fetching data.")
+                all_data = get_data(target)
+        else:
+            print(filename + " didn't exist. Fetching data.")
             all_data = get_data(target)
-    else:
-        print(filename + " didn't exist. Fetching data.")
-        all_data = get_data(target)
 
-    analyze_lang = False
-    filename = os.path.join(save_dir, target + "_names_by_language.json")
-    if os.path.exists(filename):
         analyze_lang = False
+        filename = os.path.join(save_dir, target + "_names_by_language.json")
+        if os.path.exists(filename):
+            analyze_lang = False
 
-    get_account_ages(all_data, "", num_ranges)
-    find_bots(all_data)
-    find_eggs(all_data)
-    analyze_account_names(all_data, analyze_lang)
-    analyze_activity(all_data)
-    analyze_locations(all_data)
-    analyze_geo_data(all_data)
-    get_ranges_for_var(all_data, "statuses_count", num_ranges)
-    get_ranges_for_var(all_data, "favourites_count", num_ranges)
-    get_ranges_for_var(all_data, "friends_count", num_ranges)
-    get_ranges_for_var(all_data, "followers_count", num_ranges)
-    get_ranges_for_var(all_data, "listed_count", num_ranges)
+        get_account_ages(all_data, "", num_ranges)
+        find_bots(all_data)
+        find_eggs(all_data)
+        analyze_account_names(all_data, analyze_lang)
+        analyze_activity(all_data)
+        analyze_locations(all_data)
+        analyze_geo_data(all_data)
+        get_ranges_for_var(all_data, "statuses_count", num_ranges)
+        get_ranges_for_var(all_data, "favourites_count", num_ranges)
+        get_ranges_for_var(all_data, "friends_count", num_ranges)
+        get_ranges_for_var(all_data, "followers_count", num_ranges)
+        get_ranges_for_var(all_data, "listed_count", num_ranges)
 
+        print_count_map(all_data, "statuses_count")
+        print_count_map(all_data, "followers_count")
+        print_count_map(all_data, "friends_count")
 
