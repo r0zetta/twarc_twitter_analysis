@@ -1410,78 +1410,86 @@ def get_average(list):
     return float(sum_items/num_items)
 
 def is_bot_name(name):
-    interesting = True
+    ret = True
     if re.search("^([A-Z]?[a-z]{1,})?[\_]?([A-Z]?[a-z]{1,})?[\_]?[0-9]{,9}$", name):
-        interesting = False
+        ret = False
     if re.search("^[\_]{,3}[A-Z]{2,}[\_]{,3}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{2}[a-z]{2,}$", name):
-        interesting = False
+        ret = False
     if re.search("^([A-Z][a-z]{1,}){3}[0-9]?$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{1,}[a-z]{1,}[A-Z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{1,}[a-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^([A-Z]?[a-z]{1,}[\_]{1,}){1,}[A-Z]?[a-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{1,}[a-z]{1,}[\_][A-Z][\_][A-Z]{1,}[a-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[a-z]{1,}[A-Z][a-z]{1,}[A-Z][a-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{1,}[A-Z][a-z]{1,}[A-Z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^([A-Z][\_]){1,}[A-Z][a-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[\_][A-Z][a-z]{1,}[\_][A-Z][a-z]{1,}[\_]?$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{1,}[\_][A-Z][\_][A-Z]$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{2,}[0-9][A-Z][a-z]{2,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{1,}[0-9]?$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{1,}[\_][A-Z]$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{1,}[A-Z]{2}[a-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[\_]{1,}[a-z]{2,}[\_]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{2,}[\_][A-Z][a-z]{2,}[\_][A-Z]$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]?[a-z]{2,}[0-9]{2}[\_]?[A-Z]?[a-z]{2,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{2,}[A-Z]{1,}[0-9]{,2}$", name):
-        interesting = False
+        ret = False
     if re.search("^[\_][A-Z][a-z]{2,}[A-Z][a-z]{2,}[\_]$", name):
-        interesting = False
+        ret = False
     if re.search("^([A-Z][a-z]{1,}){2,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{2,}[\_][A-Z]{2}$", name):
-        interesting = False
+        ret = False
     if re.search("^[a-z]{3,}[0-9][a-z]{3,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[a-z]{4,}[A-Z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{3,}[A-Z][0-9]{,9}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{2,}[\_][A-Z][a-z]{3,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{3,}[A-Z]{1,3}[a-z]{3,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{3,}[a-z]{3,}[0-9]?$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]?[a-z]{3,}[\_]+$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{3,}[\_][a-z]{3,}[\_][A-Za-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{2,}[a-z]{3,}[A-Z][a-z]{3,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{2,}[A-Z][a-z]{3,}[\_]?[A-Z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{4,}[0-9]{2,9}$", name):
-        interesting = False
-    return interesting
+        ret = False
+    if re.search("^[A-Z]{1,2}[a-z]{3,}[A-Z]{1,2}[a-z]{3,}[0-9]{1,9}$", name):
+        ret = False
+    if re.search("^[A-Z]+[a-z]{3,}[0-9]{1,9}$", name):
+        ret = False
+    if re.search("^([A-Z]?[a-z]{2,})+[0-9]{1,9}$", name):
+        ret = False
+    if re.search("^([A-Z]?[a-z]{2,})+\_?[a-z]+$", name):
+        ret = False
+    return ret
 
 def strip_crap(text):
     debug_print(sys._getframe().f_code.co_name)

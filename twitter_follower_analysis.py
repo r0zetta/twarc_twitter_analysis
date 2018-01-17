@@ -5,6 +5,7 @@ from tweepy import API
 from tweepy import Cursor
 from datetime import datetime, date, time, timedelta
 from authentication_keys import get_account_credentials, get_account_sequential
+from alphabet_detector import AlphabetDetector
 from langdetect import detect
 import numpy as np
 import pygal
@@ -35,78 +36,86 @@ def sort_to_list(dict_data):
     return ret
 
 def is_bot_name(name):
-    interesting = True
+    ret = True
     if re.search("^([A-Z]?[a-z]{1,})?[\_]?([A-Z]?[a-z]{1,})?[\_]?[0-9]{,9}$", name):
-        interesting = False
+        ret = False
     if re.search("^[\_]{,3}[A-Z]{2,}[\_]{,3}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{2}[a-z]{2,}$", name):
-        interesting = False
+        ret = False
     if re.search("^([A-Z][a-z]{1,}){3}[0-9]?$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{1,}[a-z]{1,}[A-Z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{1,}[a-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^([A-Z]?[a-z]{1,}[\_]{1,}){1,}[A-Z]?[a-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{1,}[a-z]{1,}[\_][A-Z][\_][A-Z]{1,}[a-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[a-z]{1,}[A-Z][a-z]{1,}[A-Z][a-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{1,}[A-Z][a-z]{1,}[A-Z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^([A-Z][\_]){1,}[A-Z][a-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[\_][A-Z][a-z]{1,}[\_][A-Z][a-z]{1,}[\_]?$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{1,}[\_][A-Z][\_][A-Z]$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{2,}[0-9][A-Z][a-z]{2,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{1,}[0-9]?$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{1,}[\_][A-Z]$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{1,}[A-Z]{2}[a-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[\_]{1,}[a-z]{2,}[\_]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{2,}[\_][A-Z][a-z]{2,}[\_][A-Z]$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]?[a-z]{2,}[0-9]{2}[\_]?[A-Z]?[a-z]{2,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{2,}[A-Z]{1,}[0-9]{,2}$", name):
-        interesting = False
+        ret = False
     if re.search("^[\_][A-Z][a-z]{2,}[A-Z][a-z]{2,}[\_]$", name):
-        interesting = False
+        ret = False
     if re.search("^([A-Z][a-z]{1,}){2,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{2,}[\_][A-Z]{2}$", name):
-        interesting = False
+        ret = False
     if re.search("^[a-z]{3,}[0-9][a-z]{3,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[a-z]{4,}[A-Z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{3,}[A-Z][0-9]{,9}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{2,}[\_][A-Z][a-z]{3,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{3,}[A-Z]{1,3}[a-z]{3,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{3,}[a-z]{3,}[0-9]?$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]?[a-z]{3,}[\_]+$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{3,}[\_][a-z]{3,}[\_][A-Za-z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{2,}[a-z]{3,}[A-Z][a-z]{3,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z][a-z]{2,}[A-Z][a-z]{3,}[\_]?[A-Z]{1,}$", name):
-        interesting = False
+        ret = False
     if re.search("^[A-Z]{4,}[0-9]{2,9}$", name):
-        interesting = False
-    return interesting
+        ret = False
+    if re.search("^[A-Z]{1,2}[a-z]{3,}[A-Z]{1,2}[a-z]{3,}[0-9]{1,9}$", name):
+        ret = False
+    if re.search("^[A-Z]+[a-z]{3,}[0-9]{1,9}$", name):
+        ret = False
+    if re.search("^([A-Z]?[a-z]{2,})+[0-9]{1,9}$", name):
+        ret = False
+    if re.search("^([A-Z]?[a-z]{2,})+\_?[a-z]+$", name):
+        ret = False
+    return ret
 
 def twarc_time_to_readable(time_string):
     twarc_format = "%a %b %d %H:%M:%S %Y"
@@ -206,9 +215,6 @@ def get_follower_ids(target):
     auth.set_access_token(access_token, access_token_secret)
     auth_api = API(auth)
     print "Signing in as: "+auth_api.me().name
-    queried = 0
-    threshold = 20
-    max = 100
     print("Target: " + target)
     print("Getting follower ids")
     follower_ids = auth_api.followers_ids(target)
@@ -549,28 +555,61 @@ def analyze_geo_data(all_data):
 
 def is_bot(d):
     ret = False
-    score = 0
+    susp_score = 0
     egg = is_egg(d)
     sn = d["screen_name"]
     bot_name = is_bot_name(sn)
     tweets = d["statuses_count"]
-    following = d["friends_count"]
+    friends = d["friends_count"]
     followers = d["followers_count"]
+    created_at = user["created_at"]
+    location = user["location"]
+    time_obj = twarc_time_to_object(created_at)
+    created_year = int(time_obj.strftime("%Y"))
     if egg == True:
-        score += 50
+        susp_score += 50
     if bot_name == True:
-        score += 100
-    if following == 21:
-        score += 100
-    if following < 22:
-        score += 50
-    if followers == 0:
-        score += 100 
+        susp_score += 100
+    if created_year < 2017:
+        susp_score -= 300
+    if len(location) > 0:
+        susp_score -= 150
+    if len(sn) == 15:
+        susp_score += 100
     if tweets == 0:
-        score += 100
-    if score > 300:
-        ret = True
-    return ret
+        susp_score += 50
+    if tweets > 0:
+        susp_score -= 50
+    if tweets > 20:
+        susp_score -= 100
+    if friends == 21:
+        susp_score += 100
+    if friends == 0:
+        susp_score += 50
+    if friends != 21:
+        susp_score -= 50
+    if friends > 40:
+        susp_score -= 100
+    if friends > 100:
+        susp_score -= 100
+    if followers == 0:
+        susp_score += 50
+    if followers > 0:
+        susp_score -= 200
+    if len(n) < 3:
+        susp_score += 100
+    if ad.only_alphabet_chars(n, "CYRILLIC"):
+        susp_score += 200
+    if ad.only_alphabet_chars(n, "ARABIC"):
+        susp_score += 200
+    if ad.is_cjk(n):
+        susp_score += 200
+    if ad.only_alphabet_chars(n, "LATIN"):
+        susp_score -= 100
+    if susp_score > 0:
+        return True
+    else:
+        return False
 
 def find_bots(all_data):
     bots = []
@@ -635,6 +674,7 @@ def pretty_print_counter(start, middle, end, counter_list):
 
 
 if __name__ == '__main__':
+    ad = AlphabetDetector()
     num_ranges = 1000
     input_file = "config/accounts.txt"
     account_list = ["r0zetta"]
