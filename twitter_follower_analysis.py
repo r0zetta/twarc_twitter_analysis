@@ -558,12 +558,13 @@ def is_bot(d):
     susp_score = 0
     egg = is_egg(d)
     sn = d["screen_name"]
+    n = d["name"]
     bot_name = is_bot_name(sn)
     tweets = d["statuses_count"]
     friends = d["friends_count"]
     followers = d["followers_count"]
-    created_at = user["created_at"]
-    location = user["location"]
+    created_at = d["created_at"]
+    location = d["location"]
     time_obj = twarc_time_to_object(created_at)
     created_year = int(time_obj.strftime("%Y"))
     if egg == True:
