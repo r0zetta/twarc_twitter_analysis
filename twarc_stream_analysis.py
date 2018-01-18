@@ -80,6 +80,7 @@ def init_config():
     conf["config"]["log_metadata"] = False
     conf["config"]["log_interarrivals"] = True
     conf["config"]["log_timeline_data"] = False
+    conf["config"]["log_all_interactions"] = True
     conf["config"]["dump_dicts"] = False
     conf["config"]["dump_raw_data"] = False
     conf["config"]["dump_graphs"] = True
@@ -399,6 +400,16 @@ def get_from_list_data(variable, category, name):
 # Custom storage and wrappers
 #############################
 
+def record_all_interactions(source, target):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    if "all_interactions" not in data:
+        data["all_interactions"] = {}
+    if source not in data["all_interactions"]:
+        data["all_interactions"][source] = []
+    if target not in data["all_interactions"][source]:
+        data["all_interactions"][source].append(target)
+
 def record_interaction(target, name, interaction):
     debug_print(sys._getframe().f_code.co_name)
     if conf["config"]["record_interactions"] == False:
@@ -406,15 +417,11 @@ def record_interaction(target, name, interaction):
     label = interaction + "_" + target
     increment_storage_large("interactions", label, name)
 
-def get_interaction(target, name, interaction):
-    debug_print(sys._getframe().f_code.co_name)
-    label = interaction + "_" + target
-    return get_storage_large("interactions", label, name)
-
 def increment_monitored_interactions(name, monitored_type):
     debug_print(sys._getframe().f_code.co_name)
     label = "interacted_with_" + monitored_type
     increment_storage_large("users", label, name)
+    global data
     if label not in data:
         data[label] = []
     if name not in data[label]:
@@ -441,6 +448,20 @@ def record_bot_list(name, category):
         data[label] = []
     if name not in data[label]:
         data[label].append(name)
+
+def dump_all_interactions():
+    debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["log_all_interactions"] == False:
+        return
+    if "all_interactions" in data:
+        filename = "data/custom/all_interactions.csv"
+        handle = io.open(filename, "w", encoding='utf-8')
+        handle.write(u"Source,Target\n")
+        for source, targets in data["all_interactions"].iteritems():
+            for target in targets:
+                if source != target:
+                    handle.write(source + u"," + target + u"\n")
+        handle.close()
 
 def dump_interacted_with_suspicious():
     debug_print(sys._getframe().f_code.co_name)
@@ -2582,6 +2603,7 @@ def dump_data():
     dump_suspicious_retweets()
     dump_suspicious_tweets()
     dump_bot_list()
+    dump_all_interactions()
     dump_interacted_with_suspicious()
     for label in ["good", "bad", "monitored", "suspicious"]:
         dump_interacted_with_monitored(label)
@@ -2706,6 +2728,8 @@ def process_tweet(status):
     if "in_reply_to_screen_name" in status:
         info["replied_to"] = status["in_reply_to_screen_name"]
         if info["replied_to"] is not None:
+            if conf["config"]["log_all_interactions"] == True:
+                record_all_interactions(info["name"], info["replied_to"])
             if exists_data("users", "suspicious", info["replied_to"]) == True:
                 info["interacted_with_suspicious"] = True
                 increment_monitored_interactions(info["name"], "suspicious")
@@ -2739,6 +2763,8 @@ def process_tweet(status):
         info["retweeted_name"] = status["retweeted_screen_name"]
         if info["retweeted_name"] is not None:
             add_data("users", "retweeters", info["name"])
+            if conf["config"]["log_all_interactions"] == True:
+                record_all_interactions(info["name"], info["retweeted_name"])
             if exists_data("users", "suspicious", info["retweeted_name"]) == True:
                 info["interacted_with_suspicious"] = True
                 increment_monitored_interactions(info["name"], "suspicious")
@@ -2813,6 +2839,8 @@ def process_tweet(status):
     if "quoted_screen_name" in status:
         info["quote_tweeted_name"] = status["quoted_screen_name"]
         if info["quote_tweeted_name"] is not None:
+            if conf["config"]["log_all_interactions"] == True:
+                record_all_interactions(info["name"], info["quote_tweeted_name"])
             if exists_data("users", "suspicious", info["quote_tweeted_name"]) == True:
                 info["interacted_with_suspicious"] = True
                 increment_monitored_interactions(info["name"], "suspicious")
@@ -2978,6 +3006,8 @@ def process_tweet(status):
         if len(mentions) > 0:
             for m in mentions:
                 if m is not None:
+                    if conf["config"]["log_all_interactions"] == True:
+                        record_all_interactions(info["name"], m)
                     if exists_data("users", "suspicious", m) == True:
                         info["interacted_with_suspicious"] = True
                         increment_monitored_interactions(info["name"], "suspicious")
