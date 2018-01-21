@@ -481,6 +481,17 @@ def dump_all_interactions():
                     handle.write(source + u"," + target + u"\n")
         handle.close()
 
+def dump_user_hashtag_interactions():
+    debug_print(sys._getframe().f_code.co_name)
+    filename = "data/custom/user_hashtag_interactions.csv"
+    if "user_hashtag_interactions" in data:
+        with io.open(filename, "w", encoding="utf-8") as f:
+            f.write(u"Source,Target\n")
+            for source, targets in data["user_hashtag_interactions"].iteritems():
+                for target in targets:
+                    if source is not None and target is not None:
+                        f.write(source + u"," + target + u"\n")
+
 def dump_hashtag_interactions():
     debug_print(sys._getframe().f_code.co_name)
     filename = "data/custom/hashtag_interactions.csv"
@@ -1280,6 +1291,16 @@ def get_category_from_periodic_data(data_type, category):
 def del_from_periodic_data(data_type, category):
     debug_print(sys._getframe().f_code.co_name)
     del_category_from_storage(data_type, category)
+
+def record_user_hashtag_map(username, hashtag):
+    global data
+    debug_print(sys._getframe().f_code.co_name)
+    if "user_hashtag_interactions" not in data:
+        data["user_hashtag_interactions"] = {}
+    if username not in data["user_hashtag_interactions"]:
+        data["user_hashtag_interactions"][username] = []
+    if hashtag not in data["user_hashtag_interactions"][username]:
+        data["user_hashtag_interactions"][username].append(hashtag)
 
 def add_graphing_data(category, username, item):
     debug_print(sys._getframe().f_code.co_name)
@@ -2634,6 +2655,7 @@ def dump_data():
     dump_bot_list()
     dump_all_interactions()
     dump_hashtag_interactions()
+    dump_user_hashtag_interactions()
     dump_interacted_with_suspicious()
     for label in ["good", "bad", "monitored", "suspicious"]:
         dump_interacted_with_monitored(label)
@@ -2952,6 +2974,7 @@ def process_tweet(status):
                     info["hashtags"].append(t)
                     add_data("metadata", "all_hashtags", t)
                     add_graphing_data("hashtags", info["name"], t)
+                    record_user_hashtag_map(info["name"], t)
                     add_timeline_data(info["tweet_time_readable"], info["name"], "used hashtag", t, info["tweet_id"])
                     increment_per_hour("all_hashtags", info["datestring"], t)
                     for h in conf["settings"]["monitored_hashtags"]:
