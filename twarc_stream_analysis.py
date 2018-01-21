@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from collections import Counter
+from itertools import combinations
 from twarc import Twarc
 from authentication_keys import get_account_credentials
 from datetime import datetime, date, time, timedelta
@@ -400,6 +401,23 @@ def get_from_list_data(variable, category, name):
 # Custom storage and wrappers
 #############################
 
+def record_hashtag_interactions(hashtag_list):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    interactions = []
+    if len(hashtag_list) > 1:
+        for comb in combinations(hashtag_list, 2):
+            interactions.append(comb)
+    if len(interactions) > 0:
+        for inter in interactions:
+            item1, item2 = inter
+            if "hashtag_interactions" not in data:
+                data["hashtag_interactions"] = {}
+            if item1 not in data["hashtag_interactions"]:
+                data["hashtag_interactions"][item1] = []
+            if item2 not in data["hashtag_interactions"][item1]:
+                data["hashtag_interactions"][item1].append(item2)
+
 def record_all_interactions(source, target):
     debug_print(sys._getframe().f_code.co_name)
     global data
@@ -462,6 +480,17 @@ def dump_all_interactions():
                 if source != target:
                     handle.write(source + u"," + target + u"\n")
         handle.close()
+
+def dump_hashtag_interactions():
+    debug_print(sys._getframe().f_code.co_name)
+    filename = "data/custom/hashtag_interactions.csv"
+    if "hashtag_interactions" in data:
+        with io.open(filename, "w", encoding="utf-8") as f:
+            f.write(u"Source,Target\n")
+            for source, targets in data["hashtag_interactions"].iteritems():
+                for target in targets:
+                    if source != target and source is not None and target is not None:
+                        f.write(source + u"," + target + u"\n")
 
 def dump_interacted_with_suspicious():
     debug_print(sys._getframe().f_code.co_name)
@@ -2604,6 +2633,7 @@ def dump_data():
     dump_suspicious_tweets()
     dump_bot_list()
     dump_all_interactions()
+    dump_hashtag_interactions()
     dump_interacted_with_suspicious()
     for label in ["good", "bad", "monitored", "suspicious"]:
         dump_interacted_with_monitored(label)
@@ -2912,11 +2942,13 @@ def process_tweet(status):
     info["hashtags"] = []
     info["positive_hashtags"] = 0
     info["negative_hashtags"] = 0
+    hashtag_list = []
     if "hashtags" in status:
         tags = status["hashtags"]
         if len(tags) > 0:
             for t in tags:
                 if t is not None:
+                    hashtag_list.append(t)
                     info["hashtags"].append(t)
                     add_data("metadata", "all_hashtags", t)
                     add_graphing_data("hashtags", info["name"], t)
@@ -2953,6 +2985,7 @@ def process_tweet(status):
 
             info["positive_hashtags"] += get_userinfo_value("all_users", info["name"], "positive_hashtags")
             info["negative_hashtags"] += get_userinfo_value("all_users", info["name"], "negative_hashtags")
+    record_hashtag_interactions(hashtag_list)
 
 # URLs
     info["urls"] = []
