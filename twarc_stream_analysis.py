@@ -400,6 +400,16 @@ def get_from_list_data(variable, category, name):
 #############################
 # Custom storage and wrappers
 #############################
+def record_user_hashtag_interaction(username, hashtag):
+    global data
+    debug_print(sys._getframe().f_code.co_name)
+    if "user_hashtag_interactions" not in data:
+        data["user_hashtag_interactions"] = {}
+    if username not in data["user_hashtag_interactions"]:
+        data["user_hashtag_interactions"][username] = []
+    if hashtag not in data["user_hashtag_interactions"][username]:
+        data["user_hashtag_interactions"][username].append(hashtag)
+
 
 def record_hashtag_interactions(hashtag_list):
     debug_print(sys._getframe().f_code.co_name)
@@ -417,6 +427,16 @@ def record_hashtag_interactions(hashtag_list):
                 data["hashtag_interactions"][item1] = []
             if item2 not in data["hashtag_interactions"][item1]:
                 data["hashtag_interactions"][item1].append(item2)
+
+def record_monitored_interactions(source, target):
+    debug_print(sys._getframe().f_code.co_name)
+    global data
+    if "monitored_interactions" not in data:
+        data["monitored_interactions"] = {}
+    if source not in data["monitored_interactions"]:
+        data["monitored_interactions"][source] = []
+    if target not in data["all_interactions"][source]:
+        data["monitored_interactions"][source].append(target)
 
 def record_all_interactions(source, target):
     debug_print(sys._getframe().f_code.co_name)
@@ -466,6 +486,20 @@ def record_bot_list(name, category):
         data[label] = []
     if name not in data[label]:
         data[label].append(name)
+
+def dump_monitored_interactions():
+    debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["log_all_interactions"] == False:
+        return
+    if "monitored_interactions" in data:
+        filename = "data/custom/monitored_interactions.csv"
+        handle = io.open(filename, "w", encoding='utf-8')
+        handle.write(u"Source,Target\n")
+        for source, targets in data["monitored_interactions"].iteritems():
+            for target in targets:
+                if source != target:
+                    handle.write(source + u"," + target + u"\n")
+        handle.close()
 
 def dump_all_interactions():
     debug_print(sys._getframe().f_code.co_name)
@@ -1291,16 +1325,6 @@ def get_category_from_periodic_data(data_type, category):
 def del_from_periodic_data(data_type, category):
     debug_print(sys._getframe().f_code.co_name)
     del_category_from_storage(data_type, category)
-
-def record_user_hashtag_map(username, hashtag):
-    global data
-    debug_print(sys._getframe().f_code.co_name)
-    if "user_hashtag_interactions" not in data:
-        data["user_hashtag_interactions"] = {}
-    if username not in data["user_hashtag_interactions"]:
-        data["user_hashtag_interactions"][username] = []
-    if hashtag not in data["user_hashtag_interactions"][username]:
-        data["user_hashtag_interactions"][username].append(hashtag)
 
 def add_graphing_data(category, username, item):
     debug_print(sys._getframe().f_code.co_name)
@@ -2653,6 +2677,7 @@ def dump_data():
     dump_suspicious_retweets()
     dump_suspicious_tweets()
     dump_bot_list()
+    dump_monitored_interactions()
     dump_all_interactions()
     dump_hashtag_interactions()
     dump_user_hashtag_interactions()
@@ -2786,6 +2811,7 @@ def process_tweet(status):
                 info["interacted_with_suspicious"] = True
                 increment_monitored_interactions(info["name"], "suspicious")
                 record_interaction(info["replied_to"], info["name"], "replied_to")
+                record_monitored_interactions(info["name"], info["replied_to"])
                 info["interacted_with_suspicious_count"] = get_monitored_interactions(info["name"], "suspicious")
             if info["replied_to"].lower() in conf["settings"]["good_users"]:
                 info["interacted_with_good_user"] = True
@@ -2796,6 +2822,7 @@ def process_tweet(status):
                 info["interacted_with_bad_user"] = True
                 increment_monitored_interactions(info["name"], "bad")
                 record_interaction(info["replied_to"], info["name"], "replied_to")
+                record_monitored_interactions(info["name"], info["replied_to"])
                 info["interacted_with_bad_count"] = get_monitored_interactions(info["name"], "bad")
             add_graphing_data("replies", info["name"], info["replied_to"])
             add_timeline_data(info["tweet_time_readable"], info["name"], "replied to", info["replied_to"], info["tweet_id"])
@@ -2821,6 +2848,7 @@ def process_tweet(status):
                 info["interacted_with_suspicious"] = True
                 increment_monitored_interactions(info["name"], "suspicious")
                 record_interaction(info["retweeted_name"], info["name"], "retweeted")
+                record_monitored_interactions(info["name"], info["retweeted_name"])
                 info["interacted_with_suspicious_count"] = get_monitored_interactions(info["name"], "suspicious")
             if info["retweeted_name"].lower() in conf["settings"]["good_users"]:
                 info["interacted_with_good_user"] = True
@@ -2831,6 +2859,7 @@ def process_tweet(status):
                 info["interacted_with_bad_user"] = True
                 increment_monitored_interactions(info["name"], "bad")
                 record_interaction(info["retweeted_name"], info["name"], "retweeted")
+                record_monitored_interactions(info["name"], info["retweeted_name"])
                 info["interacted_with_bad_count"] = get_monitored_interactions(info["name"], "bad")
             retweet_id = ""
             retweet_text = ""
@@ -2897,6 +2926,7 @@ def process_tweet(status):
                 info["interacted_with_suspicious"] = True
                 increment_monitored_interactions(info["name"], "suspicious")
                 record_interaction(info["quote_tweeted_name"], info["name"], "quoted")
+                record_monitored_interactions(info["name"], info["quote_tweeted_name"])
                 info["interacted_with_suspicious_count"] = get_monitored_interactions(info["name"], "suspicious")
             if info["quote_tweeted_name"].lower() in conf["settings"]["good_users"]:
                 info["interacted_with_good_user"] = True
@@ -2907,6 +2937,7 @@ def process_tweet(status):
                 info["interacted_with_bad_user"] = True
                 increment_monitored_interactions(info["name"], "bad")
                 record_interaction(info["quote_tweeted_name"], info["name"], "quoted")
+                record_monitored_interactions(info["name"], info["quote_tweeted_name"])
                 info["interacted_with_bad_count"] = get_monitored_interactions(info["name"], "bad")
             add_graphing_data("replies", info["name"], info["replied_to"])
             add_graphing_data("quote_tweets", info["name"], info["quote_tweeted_name"])
@@ -2974,7 +3005,7 @@ def process_tweet(status):
                     info["hashtags"].append(t)
                     add_data("metadata", "all_hashtags", t)
                     add_graphing_data("hashtags", info["name"], t)
-                    record_user_hashtag_map(info["name"], t)
+                    record_user_hashtag_interaction(info["name"], t)
                     add_timeline_data(info["tweet_time_readable"], info["name"], "used hashtag", t, info["tweet_id"])
                     increment_per_hour("all_hashtags", info["datestring"], t)
                     for h in conf["settings"]["monitored_hashtags"]:
@@ -3068,6 +3099,7 @@ def process_tweet(status):
                         info["interacted_with_suspicious"] = True
                         increment_monitored_interactions(info["name"], "suspicious")
                         record_interaction(m, info["name"], "mentioned")
+                        record_monitored_interactions(info["name"], m)
                         info["interacted_with_suspicious_count"] = get_monitored_interactions(info["name"], "suspicious")
                     if m.lower() in conf["settings"]["good_users"]:
                         info["interacted_with_good_user"] = True
@@ -3078,6 +3110,7 @@ def process_tweet(status):
                         info["interacted_with_bad_user"] = True
                         increment_monitored_interactions(info["name"], "bad")
                         record_interaction(m, info["name"], "mentioned")
+                        record_monitored_interactions(info["name"], m)
                         info["interacted_with_bad_count"] = get_monitored_interactions(info["name"], "bad")
                     add_graphing_data("replies", info["name"], info["replied_to"])
                     add_data("users", "mentioned", m)
