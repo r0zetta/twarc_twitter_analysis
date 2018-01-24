@@ -1683,6 +1683,33 @@ def is_source_legit(source):
 #########################
 # Init and config reading
 #########################
+
+def save_bin(item, filename):
+    with open(filename, "wb") as f:
+        cPickle.dump(item, f)
+
+def load_bin(filename):
+    ret = None
+    if os.path.exists(filename):
+        with open(filename, "rb") as f:
+            ret = cPickle.load(f)
+    return ret
+
+def save_json(variable, filename):
+    with io.open(filename, "w", encoding="utf-8") as f:
+        f.write(unicode(json.dumps(variable, indent=4, ensure_ascii=False)))
+
+def load_json(filename):
+    ret = None
+    if os.path.exists(filename):
+        try:
+            with io.open(filename, "r", encoding="utf-8") as f:
+                ret = json.load(f)
+        except:
+            pass
+    return ret
+
+
 def read_settings(filename):
     debug_print(sys._getframe().f_code.co_name)
     config = {}
@@ -1791,9 +1818,7 @@ def read_corpus():
     global conf
     conf["corpus"] = {}
     if os.path.exists("corpus/stopwords-iso.json"):
-        handle = open("corpus/stopwords-iso.json", "r")
-        conf["corpus"]["stopwords"] = json.load(handle)
-        handle.close()
+        conf["corpus"]["stopwords"] = load_json("corpus/stopwords-iso.json")
     conf["corpus"]["legit_sources"] = read_config_preserve_case("corpus/legit_sources.txt")
     conf["corpus"]["negative_words"] = read_config("corpus/negative_words.txt")
     conf["corpus"]["positive_words"] = read_config("corpus/positive_words.txt")
@@ -1845,20 +1870,14 @@ def get_tweet_identifier_matches(tweet_text):
 ###############
 def serialize_variable(variable, filename):
     debug_print(sys._getframe().f_code.co_name)
-    serialize_dir = "serialized"
-    filename = serialize_dir + "/" + filename + ".json"
-    with io.open(filename, "w", encoding="utf-8") as f:
-        f.write(unicode(json.dumps(variable, indent=4, ensure_ascii=False)))
+    filename = os.path.join("serialized", filename + ".json")
+    save_json(variable, filename)
 
 def unserialize_variable(varname):
     debug_print(sys._getframe().f_code.co_name)
-    serialize_dir = "serialized"
     ret = None
-    if(os.path.exists(serialize_dir)):
-        filename = serialize_dir + "/" + varname + ".json"
-        if(os.path.exists(filename)):
-            with io.open(filename, "r", encoding="utf-8") as f:
-                ret = json.load(f)
+    filename = os.path.join("serialized", varname + ".json")
+    ret = load_json(filename)
     return ret
 
 def serialize_data():
@@ -1899,7 +1918,7 @@ def dump_tweet_to_disk(item):
     global dump_file_handle
     if "dump_raw_data" in conf["config"]:
         if conf["config"]["dump_raw_data"] == True:
-            json.dump(item, dump_file_handle)
+            dump_file_handle.write(unicode(json.dumps(item, indent=4, ensure_ascii=False)))
             dump_file_handle.write(u"\n")
     return
 
@@ -2553,9 +2572,7 @@ def write_userinfo_json(category, raw_data):
             return
     filename = "data/raw/userinfo_" + category + ".json"
     debug_print("Writing userinfo json: " + filename)
-    handle = open(filename, 'w')
-    json.dump(raw_data, handle, indent=4)
-    handle.close()
+    save_json(raw_data, filename)
 
 def dump_userinfo():
     debug_print(sys._getframe().f_code.co_name)
@@ -3835,7 +3852,7 @@ if __name__ == '__main__':
 
     init_tweet_processor()
     tweet_file_handle = io.open("data/raw/tweets.txt", "a", encoding="utf-8")
-    dump_file_handle = open("data/raw/raw.json", "a")
+    dump_file_handle = io.open("data/raw/raw.json", "a", encoding="utf-8")
     volume_file_handle = open("data/_tweet_volumes.txt", "a")
     analyzer = SentimentIntensityAnalyzer()
 
