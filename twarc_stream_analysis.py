@@ -435,7 +435,7 @@ def record_monitored_interactions(source, target):
         data["monitored_interactions"] = {}
     if source not in data["monitored_interactions"]:
         data["monitored_interactions"][source] = []
-    if target not in data["all_interactions"][source]:
+    if target not in data["monitored_interactions"][source]:
         data["monitored_interactions"][source].append(target)
 
 def record_all_interactions(source, target):
@@ -684,6 +684,8 @@ def get_tweeted_suspicious(name):
 
 def record_suspicious_tweet(text, url, timestamp, id_str, name, creation_date, account_age, followers, tweets):
     debug_print(sys._getframe().f_code.co_name)
+    if name in conf["settings"]["good_users"]:
+        return
     global data
     increment_storage_large("users", "tweeted_suspicious", name)
     if "tweeted_suspicious" not in data:
@@ -720,24 +722,32 @@ def record_suspicious_tweet(text, url, timestamp, id_str, name, creation_date, a
         data["suspicious_tweets"][text]["names"].append(name)
     if timestamp not in data["suspicious_tweets"][text]["timestamps"]:
         data["suspicious_tweets"][text]["timestamps"].append(timestamp)
+    if "suspicious_tweeters" not in data:
+        data["suspicious_tweeters"] = []
+    if name not in data["suspicious_tweeters"]:
+        data["suspicious_tweeters"].append(name)
 
 def dump_suspicious_tweets():
     debug_print(sys._getframe().f_code.co_name)
     if "suspicious_tweets" in data:
         filename = "data/custom/suspicious_tweets.txt"
-        handle = io.open(filename, "w", encoding='utf-8')
-        for tweet, stuff in data["suspicious_tweets"].iteritems():
-            handle.write(unicode(tweet) + u"\n")
-            handle.write(u"Tweet ID: " + unicode(stuff["twtid"]) + u"\n")
-            handle.write(u"URL: " + unicode(stuff["url"]) + u"\n")
-            handle.write(u"Account age: " + unicode("%.2f"%float(stuff["account_age"])) + u" days\n")
-            handle.write(u"Account created: " + unicode(stuff["creation_date"]) + u"\n")
-            handle.write(u"Followers: " + unicode(stuff["followers"]) + u"\n")
-            handle.write(u"Tweets: " + unicode(stuff["tweets"]) + u"\n")
-            handle.write(u"Names:\n")
-            handle.write(u", ".join(map(unicode, stuff["names"])) + u"\n")
-            handle.write(u"\n")
-        handle.close()
+        with io.open(filename, "w", encoding='utf-8') as handle:
+            for tweet, stuff in data["suspicious_tweets"].iteritems():
+                handle.write(unicode(tweet) + u"\n")
+                handle.write(u"Tweet ID: " + unicode(stuff["twtid"]) + u"\n")
+                handle.write(u"URL: " + unicode(stuff["url"]) + u"\n")
+                handle.write(u"Account age: " + unicode("%.2f"%float(stuff["account_age"])) + u" days\n")
+                handle.write(u"Account created: " + unicode(stuff["creation_date"]) + u"\n")
+                handle.write(u"Followers: " + unicode(stuff["followers"]) + u"\n")
+                handle.write(u"Tweets: " + unicode(stuff["tweets"]) + u"\n")
+                handle.write(u"Names:\n")
+                handle.write(u", ".join(map(unicode, stuff["names"])) + u"\n")
+                handle.write(u"\n")
+    if "suspicious_tweeters" in data:
+        filename = "data/custom/suspicious_tweeters.txt"
+        with io.open(filename, "w", encoding='utf-8') as handle:
+            for name in data["suspicious_tweeters"]:
+                handle.write(unicode(name) + u"\n")
 
 def get_retweeted_suspicious(name):
     debug_print(sys._getframe().f_code.co_name)
@@ -785,26 +795,34 @@ def record_suspicious_retweet(text, url, timestamp, id_str, name, retweeted_name
         data["suspicious_retweets"][text]["names"].append(name)
     if timestamp not in data["suspicious_retweets"][text]["timestamps"]:
         data["suspicious_retweets"][text]["timestamps"].append(timestamp)
+    if "suspicious_retweeters" not in data:
+        data["suspicious_retweeters"] = []
+    if name not in data["suspicious_retweeters"]:
+        data["suspicious_retweeters"].append(name)
 
 def dump_suspicious_retweets():
     debug_print(sys._getframe().f_code.co_name)
     if "suspicious_retweets" in data:
         filename = "data/custom/suspicious_retweets.txt"
-        handle = io.open(filename, "w", encoding='utf-8')
-        for tweet, stuff in data["suspicious_retweets"].iteritems():
-            handle.write(unicode(tweet) + u"\n")
-            handle.write(u"Tweet ID: " + unicode(stuff["twtid"]) + u"\n")
-            handle.write(u"URL: " + unicode(stuff["url"]) + u"\n")
-            handle.write(u"Retweeted: " + unicode(stuff["retweeted_name"]) + u"\n")
-            handle.write(u"Retweet count: " + unicode(stuff["retweet_count"]) + u"\n")
-            handle.write(u"Account age: " + unicode("%.2f"%float(stuff["account_age"])) + u" days\n")
-            handle.write(u"Account created: " + unicode(stuff["creation_date"]) + u"\n")
-            handle.write(u"Followers: " + unicode(stuff["followers"]) + u"\n")
-            handle.write(u"Tweets: " + unicode(stuff["tweets"]) + u"\n")
-            handle.write(u"Names:\n")
-            handle.write(u", ".join(map(unicode, stuff["names"])) + u"\n")
-            handle.write(u"\n")
-        handle.close()
+        with io.open(filename, "w", encoding='utf-8') as handle:
+            for tweet, stuff in data["suspicious_retweets"].iteritems():
+                handle.write(unicode(tweet) + u"\n")
+                handle.write(u"Tweet ID: " + unicode(stuff["twtid"]) + u"\n")
+                handle.write(u"URL: " + unicode(stuff["url"]) + u"\n")
+                handle.write(u"Retweeted: " + unicode(stuff["retweeted_name"]) + u"\n")
+                handle.write(u"Retweet count: " + unicode(stuff["retweet_count"]) + u"\n")
+                handle.write(u"Account age: " + unicode("%.2f"%float(stuff["account_age"])) + u" days\n")
+                handle.write(u"Account created: " + unicode(stuff["creation_date"]) + u"\n")
+                handle.write(u"Followers: " + unicode(stuff["followers"]) + u"\n")
+                handle.write(u"Tweets: " + unicode(stuff["tweets"]) + u"\n")
+                handle.write(u"Names:\n")
+                handle.write(u", ".join(map(unicode, stuff["names"])) + u"\n")
+                handle.write(u"\n")
+    if "suspicious_retweeters" in data:
+        filename = "data/custom/suspicious_retweeters.txt"
+        with io.open(filename, "w", encoding='utf-8') as handle:
+            for name in data["suspicious_retweeters"]:
+                handle.write(unicode(name) + u"\n")
 
 def record_retweet_frequency(text, url, timestamp, id_str, name):
     debug_print(sys._getframe().f_code.co_name)
