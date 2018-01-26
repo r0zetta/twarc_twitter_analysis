@@ -2117,11 +2117,21 @@ def is_graph_printable(name):
             if len(conf["settings"]["monitored_langs"]) == 0:
                 if re.search("^words_.+$", name) is not None:
                     ret = False
+    if re.search("^interacted_with_.+$", name) is not None:
+        ret = False
     if re.search("^monitored_.+$", name) is not None:
         ret = False
     if re.search("^keyword_.+$", name) is not None:
         ret = False
     if re.search("^url_keyword_.+$", name) is not None:
+        ret = False
+    if "used_identifiers" in name:
+        ret = False
+    if "suspicious" in name:
+        ret = False
+    if "bad_users" in name:
+        ret = False
+    if "good_users" in name:
         ret = False
     if "tweets" in name:
         ret = False
