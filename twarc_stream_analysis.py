@@ -1895,7 +1895,12 @@ def unserialize_variable(varname):
     debug_print(sys._getframe().f_code.co_name)
     ret = None
     filename = os.path.join("serialized", varname + ".json")
-    ret = load_json(filename)
+    if os.path.exists(filename):
+        ret = load_json(filename)
+        if ret is None:
+            filename = os.path.join("serialized.tmp", varname + ".json")
+            if os.path.exists(filename):
+                ret = load_json(filename)
     return ret
 
 def serialize_data():
