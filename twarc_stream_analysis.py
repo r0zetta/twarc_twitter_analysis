@@ -1898,8 +1898,10 @@ def unserialize_variable(varname):
     if os.path.exists(filename):
         ret = load_json(filename)
         if ret is None:
+            print("Failed to load serialized data from " + filename)
             filename = os.path.join("serialized.tmp", varname + ".json")
             if os.path.exists(filename):
+                print("Falling back to serialized data in " + filename)
                 ret = load_json(filename)
     return ret
 
