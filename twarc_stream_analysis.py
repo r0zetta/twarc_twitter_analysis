@@ -22,10 +22,6 @@ import base64
 import hashlib
 import string
 
-# record retweets of tweets made by suspicious accounts
-# Count accounts that make suspicious retweets
-# Record actual tweet URLs
-
 ##################
 # Global variables
 ##################
@@ -400,53 +396,55 @@ def get_from_list_data(variable, category, name):
 #############################
 # Custom storage and wrappers
 #############################
-def record_user_hashtag_interaction(username, hashtag):
+
+def record_one_off_interaction(item1, item2, category):
     global data
     debug_print(sys._getframe().f_code.co_name)
-    if "user_hashtag_interactions" not in data:
-        data["user_hashtag_interactions"] = {}
-    if username not in data["user_hashtag_interactions"]:
-        data["user_hashtag_interactions"][username] = []
-    if hashtag not in data["user_hashtag_interactions"][username]:
-        data["user_hashtag_interactions"][username].append(hashtag)
+    if category not in data:
+        data[category] = {}
+    if item1 not in data[category]:
+        data[category][item1] = []
+    if item2 not in data[category][item1]:
+        data[category][item1].append(item2)
 
+def record_interaction_count(item1, item2, category):
+    global data
+    debug_print(sys._getframe().f_code.co_name)
+    if category not in data:
+        data[category] = {}
+    if item1 not in data[category]:
+        data[category][item1] = {}
+    if item2 not in data[category][item1]:
+        data[category][item1][item2] = 1
+    else:
+        data[category][item1][item2] += 1
+
+def record_user_hashtag_interaction(username, hashtag):
+    debug_print(sys._getframe().f_code.co_name)
+    #record_one_off_interaction(username, hashtag, "user_hashtag_interactions")
+    record_interaction_count(username, hashtag, "user_hashtag_interaction_count")
 
 def record_hashtag_interactions(hashtag_list):
     debug_print(sys._getframe().f_code.co_name)
-    global data
     interactions = []
     if len(hashtag_list) > 1:
-        for comb in combinations(hashtag_list, 2):
+        for comb in combinations(sorted(hashtag_list), 2):
             interactions.append(comb)
     if len(interactions) > 0:
         for inter in interactions:
             item1, item2 = inter
-            if "hashtag_interactions" not in data:
-                data["hashtag_interactions"] = {}
-            if item1 not in data["hashtag_interactions"]:
-                data["hashtag_interactions"][item1] = []
-            if item2 not in data["hashtag_interactions"][item1]:
-                data["hashtag_interactions"][item1].append(item2)
+            #record_one_off_interaction(item1, item2, "hashtag_hashtag_interactions")
+            record_interaction_count(item1, item2, "hashtag_hashtag_interaction_count")
 
 def record_monitored_interactions(source, target):
     debug_print(sys._getframe().f_code.co_name)
-    global data
-    if "monitored_interactions" not in data:
-        data["monitored_interactions"] = {}
-    if source not in data["monitored_interactions"]:
-        data["monitored_interactions"][source] = []
-    if target not in data["monitored_interactions"][source]:
-        data["monitored_interactions"][source].append(target)
+    #record_one_off_interaction(source, target, "monitored_interactions")
+    record_interaction_count(source, target, "monitored_interaction_count")
 
-def record_all_interactions(source, target):
+def record_user_user_interactions(source, target):
     debug_print(sys._getframe().f_code.co_name)
-    global data
-    if "all_interactions" not in data:
-        data["all_interactions"] = {}
-    if source not in data["all_interactions"]:
-        data["all_interactions"][source] = []
-    if target not in data["all_interactions"][source]:
-        data["all_interactions"][source].append(target)
+    #record_one_off_interaction(source, target, "user_user_interactions")
+    record_interaction_count(source, target, "user_user_interaction_count")
 
 def record_interaction(target, name, interaction):
     debug_print(sys._getframe().f_code.co_name)
@@ -487,55 +485,53 @@ def record_bot_list(name, category):
     if name not in data[label]:
         data[label].append(name)
 
-def dump_monitored_interactions():
+def dump_counted_interactions(category):
     debug_print(sys._getframe().f_code.co_name)
     if conf["config"]["log_all_interactions"] == False:
         return
-    if "monitored_interactions" in data:
-        filename = "data/custom/monitored_interactions.csv"
+    if category in data:
+        filename = "data/custom/" + category + ".csv"
+        handle = io.open(filename, "w", encoding='utf-8')
+        handle.write(u"Source,Target,Weight\n")
+        for item1, other in sorted(data[category].items()):
+            for item2, count in sorted(other.items()):
+                if item1 != item2:
+                    handle.write(unicode(item1) + u"," + unicode(item2) + u"," + unicode(count) + u"\n")
+        handle.close()
+
+def dump_one_off_interactions(category):
+    debug_print(sys._getframe().f_code.co_name)
+    if conf["config"]["log_all_interactions"] == False:
+        return
+    if category in data:
+        filename = "data/custom/" + category + ".csv"
         handle = io.open(filename, "w", encoding='utf-8')
         handle.write(u"Source,Target\n")
-        for source, targets in data["monitored_interactions"].iteritems():
+        for source, targets in data[category].iteritems():
             for target in targets:
                 if source != target:
                     handle.write(source + u"," + target + u"\n")
         handle.close()
 
-def dump_all_interactions():
+def dump_monitored_interactions():
     debug_print(sys._getframe().f_code.co_name)
-    if conf["config"]["log_all_interactions"] == False:
-        return
-    if "all_interactions" in data:
-        filename = "data/custom/all_interactions.csv"
-        handle = io.open(filename, "w", encoding='utf-8')
-        handle.write(u"Source,Target\n")
-        for source, targets in data["all_interactions"].iteritems():
-            for target in targets:
-                if source != target:
-                    handle.write(source + u"," + target + u"\n")
-        handle.close()
+    #dump_one_off_interactions("monitored_interactions")
+    dump_counted_interactions("monitored_interaction_count")
+
+def dump_user_user_interactions():
+    debug_print(sys._getframe().f_code.co_name)
+    #dump_one_off_interactions("user_user_interactions")
+    dump_counted_interactions("user_user_interaction_count")
 
 def dump_user_hashtag_interactions():
     debug_print(sys._getframe().f_code.co_name)
-    filename = "data/custom/user_hashtag_interactions.csv"
-    if "user_hashtag_interactions" in data:
-        with io.open(filename, "w", encoding="utf-8") as f:
-            f.write(u"Source,Target\n")
-            for source, targets in data["user_hashtag_interactions"].iteritems():
-                for target in targets:
-                    if source is not None and target is not None:
-                        f.write(source + u"," + target + u"\n")
+    #dump_one_off_interactions("user_hashtag_interactions")
+    dump_counted_interactions("user_hashtag_interaction_count")
 
 def dump_hashtag_interactions():
     debug_print(sys._getframe().f_code.co_name)
-    filename = "data/custom/hashtag_interactions.csv"
-    if "hashtag_interactions" in data:
-        with io.open(filename, "w", encoding="utf-8") as f:
-            f.write(u"Source,Target\n")
-            for source, targets in data["hashtag_interactions"].iteritems():
-                for target in targets:
-                    if source != target and source is not None and target is not None:
-                        f.write(source + u"," + target + u"\n")
+    #dump_one_off_interactions("hashtag_hashtag_interactions")
+    dump_counted_interactions("hashtag_hashtag_interaction_count")
 
 def dump_interacted_with_suspicious():
     debug_print(sys._getframe().f_code.co_name)
@@ -2730,7 +2726,7 @@ def dump_data():
     dump_suspicious_tweets()
     dump_bot_list()
     dump_monitored_interactions()
-    dump_all_interactions()
+    dump_user_user_interactions()
     dump_hashtag_interactions()
     dump_user_hashtag_interactions()
     dump_interacted_with_suspicious()
@@ -2858,7 +2854,7 @@ def process_tweet(status):
         info["replied_to"] = status["in_reply_to_screen_name"]
         if info["replied_to"] is not None:
             if conf["config"]["log_all_interactions"] == True:
-                record_all_interactions(info["name"], info["replied_to"])
+                record_user_user_interactions(info["name"], info["replied_to"])
             if exists_data("users", "suspicious", info["replied_to"]) == True:
                 info["interacted_with_suspicious"] = True
                 increment_monitored_interactions(info["name"], "suspicious")
@@ -2895,7 +2891,7 @@ def process_tweet(status):
         if info["retweeted_name"] is not None:
             add_data("users", "retweeters", info["name"])
             if conf["config"]["log_all_interactions"] == True:
-                record_all_interactions(info["name"], info["retweeted_name"])
+                record_user_user_interactions(info["name"], info["retweeted_name"])
             if exists_data("users", "suspicious", info["retweeted_name"]) == True:
                 info["interacted_with_suspicious"] = True
                 increment_monitored_interactions(info["name"], "suspicious")
@@ -2973,7 +2969,7 @@ def process_tweet(status):
         info["quote_tweeted_name"] = status["quoted_screen_name"]
         if info["quote_tweeted_name"] is not None:
             if conf["config"]["log_all_interactions"] == True:
-                record_all_interactions(info["name"], info["quote_tweeted_name"])
+                record_user_user_interactions(info["name"], info["quote_tweeted_name"])
             if exists_data("users", "suspicious", info["quote_tweeted_name"]) == True:
                 info["interacted_with_suspicious"] = True
                 increment_monitored_interactions(info["name"], "suspicious")
@@ -3146,7 +3142,7 @@ def process_tweet(status):
             for m in mentions:
                 if m is not None:
                     if conf["config"]["log_all_interactions"] == True:
-                        record_all_interactions(info["name"], m)
+                        record_user_user_interactions(info["name"], m)
                     if exists_data("users", "suspicious", m) == True:
                         info["interacted_with_suspicious"] = True
                         increment_monitored_interactions(info["name"], "suspicious")
