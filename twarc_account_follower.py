@@ -242,7 +242,8 @@ def dump_stuff():
                 for item, count in sorted(data[f].items(), key=lambda x:x[1], reverse=True):
                     entry = unicode(count) + u"\t" + unicode(item) + u"\n"
                     handle.write(entry)
-    save_json(data, "data.json")
+    filename = os.path.join(save_dir, "data.json")
+    save_json(data, filename)
     print("Done")
 
 
@@ -273,6 +274,8 @@ if __name__ == '__main__':
         data = old_data
     previous_dump = int(time.time())
     for status in t.filter(follow=query):
+        if "user" not in status or "text" not in status:
+            continue
         sn = status["user"]["screen_name"]
         record_frequency_dist("tweeter_frequencies", sn)
         text = status["text"]
