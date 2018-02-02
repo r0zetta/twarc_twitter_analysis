@@ -5,7 +5,6 @@ from tweepy import API
 from authentication_keys import get_account_credentials
 from datetime import datetime, date, time, timedelta
 from itertools import combinations
-from nltk.corpus import stopwords
 import time
 import json
 import io
@@ -221,7 +220,6 @@ def process_text(text):
     return cleaned
 
 def dump_stuff():
-    save_dir = "account_follower"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     interactions = ["word_interactions", "user_user_interactions", "hashtag_hashtag_interactions"]
@@ -244,15 +242,16 @@ def dump_stuff():
                 for item, count in sorted(data[f].items(), key=lambda x:x[1], reverse=True):
                     entry = unicode(count) + u"\t" + unicode(item) + u"\n"
                     handle.write(entry)
+    save_json(data, "data.json")
     print("Done")
 
 
 if __name__ == '__main__':
+    save_dir = "account_follower"
     extra_stopwords = []
-    all_stopwords = stopwords.words('english')
+    stopword_file = load_json("corpus/stopwords-iso.json")
+    all_stopwords = stopword_file["en"]
     all_stopwords += extra_stopwords
-
-    save_json(all_stopwords, "all_stopwords.json")
 
     config_file = "config/to_follow.txt"
     to_follow = read_account_names(config_file)
@@ -268,6 +267,10 @@ if __name__ == '__main__':
     print("Listening to stream...")
     print
     data = {}
+    filename = os.path.join(save_dir, "data.json")
+    old_data = load_json(filename)
+    if old_data is not None:
+        data = old_data
     previous_dump = int(time.time())
     for status in t.filter(follow=query):
         sn = status["user"]["screen_name"]
