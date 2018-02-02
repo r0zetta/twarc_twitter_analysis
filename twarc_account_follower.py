@@ -5,6 +5,7 @@ from tweepy import API
 from authentication_keys import get_account_credentials
 from datetime import datetime, date, time, timedelta
 from itertools import combinations
+from nltk.corpus import stopwords
 import time
 import json
 import io
@@ -203,13 +204,10 @@ def process_text(text):
     cleaned = []
     for token in tokens:
         if len(token) > 0:
-            if stopwords is not None:
-                for s in stopwords:
+            if all_stopwords is not None:
+                for s in all_stopwords:
                     if token == s:
                         token = None
-            if token is not None:
-                if re.search("^[0-9\.\-\s\/]+$", token):
-                    token = None
             if token is not None:
                 if re.search(".+…$", token):
                     token = None
@@ -238,7 +236,7 @@ def dump_stuff():
                     for target, count in sorted(targets.items()):
                         if source != target and source is not None and target is not None:
                             handle.write(source + u"," + target + u"," + unicode(count) + u"\n")
-    freq_dists = ["tweet_frequencies", "tweeter_frequencies", "word_frequencies", "interacted_frequencies", "hashtag_frequencies"]
+    freq_dists = ["tweet_frequencies", "tweeter_frequencies", "word_frequencies", "interacted_frequencies", "hashtag_frequencies", "influencer_frequencies"]
     for f in freq_dists:
         if f in data:
             filename = os.path.join(save_dir, f + ".txt")
@@ -246,15 +244,15 @@ def dump_stuff():
                 for item, count in sorted(data[f].items(), key=lambda x:x[1], reverse=True):
                     entry = unicode(count) + u"\t" + unicode(item) + u"\n"
                     handle.write(entry)
+    print("Done")
 
 
 if __name__ == '__main__':
-    all_stopwords = load_json("corpus/stopwords-iso.json")
     extra_stopwords = []
-    stopwords = None
-    if all_stopwords is not None:
-        stopwords = all_stopwords["en"]
-        stopwords += extra_stopwords
+    all_stopwords = stopwords.words('english')
+    all_stopwords += extra_stopwords
+
+    save_json(all_stopwords, "all_stopwords.json")
 
     config_file = "config/to_follow.txt"
     to_follow = read_account_names(config_file)
@@ -291,7 +289,8 @@ if __name__ == '__main__':
         if interactions is not None and len(interactions) > 0:
             int_printable = ",".join(interactions)
             for n in interactions:
-                record_frequency_dist("interacted_frequencies", n)
+                record_frequency_dist("influencer_frequencies", n)
+                record_frequency_dist("interacted_frequencies", sn)
             add_interactions("user_user_interactions", sn, interactions)
 
         hashtags = process_hashtags(status)
@@ -303,6 +302,7 @@ if __name__ == '__main__':
             if len(hashtags) > 1:
                 record_word_interactions("hashtag_hashtag_interactions", hashtags)
 
+        print text
         print(sn + " [" + int_printable + "] [" + hashtags_printable + "] " + tokens_printable)
         if int(time.time()) - previous_dump > 10:
             print("Dumping")
