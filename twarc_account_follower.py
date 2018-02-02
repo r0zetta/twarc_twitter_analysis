@@ -5,6 +5,8 @@ from tweepy import API
 from authentication_keys import get_account_credentials
 from datetime import datetime, date, time, timedelta
 from itertools import combinations
+import Queue
+import threading
 import time
 import json
 import io
@@ -246,9 +248,70 @@ def dump_stuff():
     save_json(data, filename)
     print("Done")
 
+def process_tweet(status):
+    global previous_dump
+    if "user" not in status or "text" not in status:
+        return
+    sn = status["user"]["screen_name"]
+    record_frequency_dist("tweeter_frequencies", sn)
+    text = status["text"]
+
+    tokens = process_text(text)
+    tokens_printable = ""
+    if tokens is not None and len(tokens) > 0:
+        tokens_printable = " ".join(tokens)
+        record_frequency_dist("tweet_frequencies", tokens_printable)
+        for t in tokens:
+            record_frequency_dist("word_frequencies", t)
+        if len(tokens) > 1:
+            record_word_interactions("word_interactions", tokens)
+
+    interactions = get_interactions(status)
+    int_printable = ""
+    if interactions is not None and len(interactions) > 0:
+        int_printable = ",".join(interactions)
+        for n in interactions:
+            record_frequency_dist("influencer_frequencies", n)
+            record_frequency_dist("interacted_frequencies", sn)
+        add_interactions("user_user_interactions", sn, interactions)
+
+    hashtags = process_hashtags(status)
+    hashtags_printable = ""
+    if hashtags is not None and len(hashtags) > 0:
+        hashtags_printable = ",".join(hashtags)
+        for h in hashtags:
+            record_frequency_dist("hashtag_frequencies", h)
+        if len(hashtags) > 1:
+            record_word_interactions("hashtag_hashtag_interactions", hashtags)
+
+    sys.stdout.write("#")
+    sys.stdout.flush()
+
+    #print(sn + " [" + int_printable + "] [" + hashtags_printable + "] " + tokens_printable)
+    if int(time.time()) - previous_dump > 10:
+        print("Dumping")
+        dump_stuff()
+        previous_dump = int(time.time())
+
+def tweet_processing_thread():
+    while True:
+        item = tweet_queue.get()
+        process_tweet(item)
+        tweet_queue.task_done()
+
+def get_tweet_stream(query, twarc):
+    print("Query: " + query)
+    for status in twarc.filter(follow=query):
+        tweet_queue.put(status)
 
 if __name__ == '__main__':
     save_dir = "account_follower"
+    data = {}
+    filename = os.path.join(save_dir, "data.json")
+    old_data = load_json(filename)
+    if old_data is not None:
+        data = old_data
+    previous_dump = int(time.time())
     extra_stopwords = []
     stopword_file = load_json("corpus/stopwords-iso.json")
     all_stopwords = stopword_file["en"]
@@ -256,61 +319,27 @@ if __name__ == '__main__':
 
     config_file = "config/to_follow.txt"
     to_follow = read_account_names(config_file)
+    print("Converting names to IDs")
     id_list = get_ids_from_names(to_follow)
     print("Names count: " + str(len(to_follow)) + " ID count: " + str(len(id_list)))
     query = ",".join(id_list)
-    print("Query: " + query)
 
     acct_name, consumer_key, consumer_secret, access_token, access_token_secret = get_account_credentials()
-    t = Twarc(consumer_key, consumer_secret, access_token, access_token_secret)
-
+    twarc = Twarc(consumer_key, consumer_secret, access_token, access_token_secret)
     print("Acct: " + acct_name)
-    print("Listening to stream...")
-    print
-    data = {}
-    filename = os.path.join(save_dir, "data.json")
-    old_data = load_json(filename)
-    if old_data is not None:
-        data = old_data
-    previous_dump = int(time.time())
-    for status in t.filter(follow=query):
-        if "user" not in status or "text" not in status:
-            continue
-        sn = status["user"]["screen_name"]
-        record_frequency_dist("tweeter_frequencies", sn)
-        text = status["text"]
 
-        tokens = process_text(text)
-        tokens_printable = ""
-        if tokens is not None and len(tokens) > 0:
-            tokens_printable = " ".join(tokens)
-            record_frequency_dist("tweet_frequencies", tokens_printable)
-            for t in tokens:
-                record_frequency_dist("word_frequencies", t)
-            if len(tokens) > 1:
-                record_word_interactions("word_interactions", tokens)
+    tweet_queue = Queue.Queue()
+    thread = threading.Thread(target=tweet_processing_thread)
+    thread.daemon = True
+    thread.start()
 
-        interactions = get_interactions(status)
-        int_printable = ""
-        if interactions is not None and len(interactions) > 0:
-            int_printable = ",".join(interactions)
-            for n in interactions:
-                record_frequency_dist("influencer_frequencies", n)
-                record_frequency_dist("interacted_frequencies", sn)
-            add_interactions("user_user_interactions", sn, interactions)
-
-        hashtags = process_hashtags(status)
-        hashtags_printable = ""
-        if hashtags is not None and len(hashtags) > 0:
-            hashtags_printable = ",".join(hashtags)
-            for h in hashtags:
-                record_frequency_dist("hashtag_frequencies", h)
-            if len(hashtags) > 1:
-                record_word_interactions("hashtag_hashtag_interactions", hashtags)
-
-        print text
-        print(sn + " [" + int_printable + "] [" + hashtags_printable + "] " + tokens_printable)
-        if int(time.time()) - previous_dump > 10:
-            print("Dumping")
-            dump_stuff()
-            previous_dump = int(time.time())
+    while True:
+        try:
+            get_tweet_stream(query, twarc)
+        except KeyboardInterrupt:
+            print "Keyboard interrupt..."
+            sys.exit(0)
+        except:
+            print("Error. Restarting...")
+            time.sleep(5)
+            pass
