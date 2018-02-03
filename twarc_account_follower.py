@@ -2,9 +2,11 @@
 from twarc import Twarc
 from tweepy import OAuthHandler
 from tweepy import API
+from tweepy import Cursor
 from authentication_keys import get_account_credentials
 from datetime import datetime, date, time, timedelta
 from itertools import combinations
+from collections import Counter
 import Queue
 import threading
 import time
@@ -40,7 +42,6 @@ def read_account_names(config_file):
 
 def get_account_data_for_names(names):
     print("Got " + str(len(names)) + " names.")
-    acct_name, consumer_key, consumer_secret, access_token, access_token_secret = get_account_credentials()
     auth = OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_token_secret)
     auth_api = API(auth)
@@ -49,6 +50,8 @@ def get_account_data_for_names(names):
     batches = (names[i:i+batch_len] for i in range(0, len(names), batch_len))
     ret = []
     for batch_count, batch in enumerate(batches):
+        sys.stdout.write("#")
+        sys.stdout.flush()
         users_list = auth_api.lookup_users(screen_names=batch)
         users_json = (map(lambda t: t._json, users_list))
         ret += users_json
@@ -61,6 +64,27 @@ def get_ids_from_names(names):
         if "id_str" in d:
             id_str = d["id_str"]
             ret.append(id_str)
+    return ret
+
+def get_associations(target):
+    ret = [target]
+    print("Getting associations for: " + target)
+    auth = OAuthHandler(consumer_key, consumer_secret)
+    auth.set_access_token(access_token, access_token_secret)
+    auth_api = API(auth)
+    inter = Counter()
+    for status in Cursor(auth_api.user_timeline, id=target).items():
+        sys.stdout.write("#")
+        sys.stdout.flush()
+        interactions = get_interactions(status._json)
+        if interactions is not None and len(interactions) > 0:
+            for n in interactions:
+                if n != "realdonaldtrump":
+                    inter[n] += 1
+    for n, c in inter.most_common(50):
+        ret.append(n)
+    print("50 most interacted accounts for " + target + ":")
+    print ret
     return ret
 
 def get_interactions(status):
@@ -103,6 +127,7 @@ def get_interactions(status):
         if status["in_reply_to_screen_name"] is not None:
             if status["in_reply_to_screen_name"] not in interactions:
                 interactions.append(status["in_reply_to_screen_name"])
+    interactions = [x.lower() for x in interactions]
     return interactions
 
 def process_hashtags(status):
@@ -117,6 +142,7 @@ def process_hashtags(status):
                         if tag is not None:
                             if tag not in hashtags:
                                 hashtags.append(tag.lower())
+    hashtags = [x.lower() for x in hashtags]
     return hashtags
 
 def record_frequency_dist(category, item):
@@ -236,7 +262,7 @@ def dump_stuff():
                     for target, count in sorted(targets.items()):
                         if source != target and source is not None and target is not None:
                             handle.write(source + u"," + target + u"," + unicode(count) + u"\n")
-    freq_dists = ["tweet_frequencies", "tweeter_frequencies", "word_frequencies", "interacted_frequencies", "hashtag_frequencies", "influencer_frequencies"]
+    freq_dists = ["tweet_frequencies", "tweeter_frequencies", "word_frequencies", "interacted_frequencies", "hashtag_frequencies", "influencer_frequencies", "not_monitored"]
     for f in freq_dists:
         if f in data:
             filename = os.path.join(save_dir, f + ".txt")
@@ -252,9 +278,11 @@ def process_tweet(status):
     global previous_dump
     if "user" not in status or "text" not in status:
         return
-    sn = status["user"]["screen_name"]
+    sn = status["user"]["screen_name"].lower()
     record_frequency_dist("tweeter_frequencies", sn)
     text = status["text"]
+    if sn not in to_follow:
+        record_frequency_dist("not_monitored", sn)
 
     tokens = process_text(text)
     tokens_printable = ""
@@ -273,6 +301,8 @@ def process_tweet(status):
         for n in interactions:
             record_frequency_dist("influencer_frequencies", n)
             record_frequency_dist("interacted_frequencies", sn)
+            if n not in to_follow:
+                record_frequency_dist("not_monitored", sn)
         add_interactions("user_user_interactions", sn, interactions)
 
     hashtags = process_hashtags(status)
@@ -300,12 +330,36 @@ def tweet_processing_thread():
         tweet_queue.task_done()
 
 def get_tweet_stream(query, twarc):
-    print("Query: " + query)
+    print("Starting stream...")
     for status in twarc.filter(follow=query):
         tweet_queue.put(status)
 
 if __name__ == '__main__':
+    acct_name, consumer_key, consumer_secret, access_token, access_token_secret = get_account_credentials()
+    print("Acct: " + acct_name)
+
     save_dir = "account_follower"
+    default_config_file = "config/to_follow.txt"
+    input_params = []
+    if (len(sys.argv) > 1):
+        input_params = sys.argv[1:]
+
+    to_follow = []
+    if len(input_params) == 1:
+        param = input_params[0]
+        if os.path.exists(param):
+            to_follow = read_account_names(param)
+        else:
+            to_follow = [param]
+    elif len(input_params) > 1:
+        to_follow = input_params
+    else:
+        to_follow = read_account_names(default_config_file)
+
+    #if len(to_follow) == 1:
+        #to_follow = get_associations(to_follow[0])
+
+    to_follow = [x.lower() for x in to_follow]
     data = {}
     filename = os.path.join(save_dir, "data.json")
     old_data = load_json(filename)
@@ -317,16 +371,12 @@ if __name__ == '__main__':
     all_stopwords = stopword_file["en"]
     all_stopwords += extra_stopwords
 
-    config_file = "config/to_follow.txt"
-    to_follow = read_account_names(config_file)
     print("Converting names to IDs")
     id_list = get_ids_from_names(to_follow)
     print("Names count: " + str(len(to_follow)) + " ID count: " + str(len(id_list)))
     query = ",".join(id_list)
 
-    acct_name, consumer_key, consumer_secret, access_token, access_token_secret = get_account_credentials()
     twarc = Twarc(consumer_key, consumer_secret, access_token, access_token_secret)
-    print("Acct: " + acct_name)
 
     tweet_queue = Queue.Queue()
     thread = threading.Thread(target=tweet_processing_thread)
