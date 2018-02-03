@@ -79,8 +79,9 @@ def get_associations(target):
         interactions = get_interactions(status._json)
         if interactions is not None and len(interactions) > 0:
             for n in interactions:
-                if n != "realdonaldtrump" and n!= target:
-                    inter[n] += 1
+                if n != target:
+                    if n not in ignore_list:
+                        inter[n] += 1
     for n, c in inter.most_common(50):
         if n not in ret:
             ret.append(n)
@@ -148,6 +149,8 @@ def process_hashtags(status):
 
 def record_frequency_dist(category, item):
     global data
+    if item in ignore_list:
+        return
     if category not in data:
         data[category] = {}
     if item not in data[category]:
@@ -176,16 +179,19 @@ def record_word_interactions(category, words):
 
 def add_interactions(category, source, targets):
     global data
+    if source in ignore_list:
+        return
     if targets is not None and len(targets) > 0:
         if category not in data:
             data[category] = {}
         if source not in data[category]:
             data[category][source] = {}
         for item in targets:
-            if item not in data[category][source]:
-                data[category][source][item] = 1
-            else:
-                data[category][source][item] += 1
+            if item not in ignore_list:
+                if item not in data[category][source]:
+                    data[category][source][item] = 1
+                else:
+                    data[category][source][item] += 1
 
 def process_text(text):
 # Processing step 1
@@ -345,6 +351,12 @@ if __name__ == '__main__':
     if (len(sys.argv) > 1):
         input_params = sys.argv[1:]
 
+    ignore_list = []
+    ignore_file = "config/ignore.txt"
+    if os.path.exists(ignore_file):
+        ignore_list = read_account_names(ignore_file)
+    ignore_list = [x.lower() for x in ignore_list]
+
     to_follow = []
     gather_associations = False
     if len(input_params) == 1:
@@ -367,6 +379,7 @@ if __name__ == '__main__':
             to_follow = get_associations(to_follow[0])
 
     to_follow = [x.lower() for x in to_follow]
+
     data = {}
     filename = os.path.join(save_dir, "data.json")
     old_data = load_json(filename)
