@@ -79,10 +79,11 @@ def get_associations(target):
         interactions = get_interactions(status._json)
         if interactions is not None and len(interactions) > 0:
             for n in interactions:
-                if n != "realdonaldtrump":
+                if n != "realdonaldtrump" and n!= target:
                     inter[n] += 1
     for n, c in inter.most_common(50):
-        ret.append(n)
+        if n not in ret:
+            ret.append(n)
     print("50 most interacted accounts for " + target + ":")
     print ret
     return ret
@@ -345,6 +346,7 @@ if __name__ == '__main__':
         input_params = sys.argv[1:]
 
     to_follow = []
+    gather_associations = False
     if len(input_params) == 1:
         param = input_params[0]
         if os.path.exists(param):
@@ -352,12 +354,17 @@ if __name__ == '__main__':
         else:
             to_follow = [param]
     elif len(input_params) > 1:
-        to_follow = input_params
+        for n in input_params:
+            if n == "gather_associations":
+                gather_associations = True
+            else:
+                to_follow.append(n)
     else:
         to_follow = read_account_names(default_config_file)
 
-    #if len(to_follow) == 1:
-        #to_follow = get_associations(to_follow[0])
+    if len(to_follow) == 1:
+        if gather_associations == True:
+            to_follow = get_associations(to_follow[0])
 
     to_follow = [x.lower() for x in to_follow]
     data = {}
