@@ -357,28 +357,38 @@ if __name__ == '__main__':
         ignore_list = read_account_names(ignore_file)
     ignore_list = [x.lower() for x in ignore_list]
 
-    to_follow = []
-    gather_associations = False
-    if len(input_params) == 1:
-        param = input_params[0]
-        if os.path.exists(param):
-            to_follow = read_account_names(param)
-        else:
-            to_follow = [param]
-    elif len(input_params) > 1:
-        for n in input_params:
-            if n == "gather_associations":
-                gather_associations = True
+    id_list_file = os.path.join(save_dir, "id_list.json")
+    id_list = []
+    if os.path.exists(id_list_file):
+        id_list = load_json(id_list_file)
+    if id_list is None or len(id_list) < 1:
+        to_follow = []
+        gather_associations = False
+        if len(input_params) == 1:
+            param = input_params[0]
+            if os.path.exists(param):
+                to_follow = read_account_names(param)
             else:
-                to_follow.append(n)
-    else:
-        to_follow = read_account_names(default_config_file)
+                to_follow = [param]
+        elif len(input_params) > 1:
+            for n in input_params:
+                if n == "gather_associations":
+                    gather_associations = True
+                else:
+                    to_follow.append(n)
+        else:
+            to_follow = read_account_names(default_config_file)
 
-    if len(to_follow) == 1:
-        if gather_associations == True:
-            to_follow = get_associations(to_follow[0])
+        if len(to_follow) == 1:
+            if gather_associations == True:
+                to_follow = get_associations(to_follow[0])
 
-    to_follow = [x.lower() for x in to_follow]
+        to_follow = [x.lower() for x in to_follow]
+        print("Names count: " + str(len(to_follow)))
+        print("Converting names to IDs")
+        id_list = get_ids_from_names(to_follow)
+    print(" ID count: " + str(len(id_list)))
+    query = ",".join(id_list)
 
     data = {}
     filename = os.path.join(save_dir, "data.json")
@@ -391,10 +401,6 @@ if __name__ == '__main__':
     all_stopwords = stopword_file["en"]
     all_stopwords += extra_stopwords
 
-    print("Converting names to IDs")
-    id_list = get_ids_from_names(to_follow)
-    print("Names count: " + str(len(to_follow)) + " ID count: " + str(len(id_list)))
-    query = ",".join(id_list)
 
     twarc = Twarc(consumer_key, consumer_secret, access_token, access_token_secret)
 
