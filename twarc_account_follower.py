@@ -387,6 +387,7 @@ if __name__ == '__main__':
         print("Names count: " + str(len(to_follow)))
         print("Converting names to IDs")
         id_list = get_ids_from_names(to_follow)
+        save_json(id_list, id_list_file)
     print(" ID count: " + str(len(id_list)))
     query = ",".join(id_list)
 
