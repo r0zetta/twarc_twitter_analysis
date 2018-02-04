@@ -255,8 +255,6 @@ def process_text(text):
     return cleaned
 
 def dump_stuff():
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
     interactions = ["word_interactions", "user_user_interactions", "hashtag_hashtag_interactions"]
     for s in interactions:
         if s in data:
@@ -346,7 +344,8 @@ if __name__ == '__main__':
     print("Acct: " + acct_name)
 
     save_dir = "account_follower"
-    default_config_file = "config/to_follow.txt"
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
     input_params = []
     if (len(sys.argv) > 1):
         input_params = sys.argv[1:]
@@ -377,6 +376,7 @@ if __name__ == '__main__':
                 else:
                     to_follow.append(n)
         else:
+            default_config_file = "config/to_follow.txt"
             to_follow = read_account_names(default_config_file)
 
         if len(to_follow) == 1:
