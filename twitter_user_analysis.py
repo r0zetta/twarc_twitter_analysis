@@ -9,6 +9,8 @@ from authentication_keys import get_account_credentials
 import numpy as np
 import pygal
 import os.path
+import requests
+import shutil
 import random
 import json
 import time
@@ -331,6 +333,7 @@ if __name__ == '__main__':
     replies = 0
     quote_tweets = 0
     own_tweets = 0
+    pictures = []
     for status in Cursor(auth_api.user_timeline, id=target).items():
         tweet_count = tweet_count + 1
 
@@ -441,6 +444,14 @@ if __name__ == '__main__':
                                     increment_counter("retweeted_mentions", mention)
                                 else:
                                     increment_counter("mentions", mention)
+            if "media" in entities:
+                for item in entities["media"]:
+                    if item is not None:
+                        if "media_url" in item:
+                            murl = item["media_url"]
+                            if murl not in pictures:
+                                pictures.append(murl)
+
 
 # get user agents
         increment_counter("sources", status.source)
@@ -564,4 +575,19 @@ if __name__ == '__main__':
     handle.close()
 
     dump_chronology()
+
+    pictures_dir = os.path.join(output_dir, "images")
+    if not os.path.exists(pictures_dir):
+        os.makedirs(pictures_dir)
+    for p in pictures:
+        m = re.search("^http:\/\/pbs\.twimg\.com\/media\/(.+)$", p)
+        if m is not None:
+            filename = m.group(1)
+            print("Getting picture from: " + p)
+            save_path = os.path.join(pictures_dir, filename)
+            response = requests.get(p, stream=True)
+            with open(save_path, 'wb') as out_file:
+                shutil.copyfileobj(response.raw, out_file)
+            del response
+
 
