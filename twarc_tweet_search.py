@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from twarc import Twarc
-from authentication_keys import get_account_credentials
+from authentication_keys import get_account_credentials, get_account_sequential
 from datetime import datetime, date, time, timedelta
 import shutil
 import pygal
@@ -27,13 +27,24 @@ test = False
 exit_correctly = False
 searches = []
 targets = []
-data = {}
 conf = {}
 acct_name = ""
 script_start_time_str = ""
 output_dir = ""
-serialize_dir = ""
-dump_dir = ""
+
+def save_json(variable, filename):
+    with io.open(filename, "w", encoding="utf-8") as f:
+        f.write(unicode(json.dumps(variable, indent=4, ensure_ascii=False)))
+
+def load_json(filename):
+    ret = None
+    if os.path.exists(filename):
+        try:
+            with io.open(filename, "r", encoding="utf-8") as f:
+                ret = json.load(f)
+        except:
+            pass
+    return ret
 
 def init_params():
     debug_print(sys._getframe().f_code.co_name)
@@ -41,7 +52,6 @@ def init_params():
     conf["params"] = {}
     conf["params"]["default_dump_interval"] = 10
     conf["params"]["config_reload_interval"] = 5
-    conf["params"]["serialization_interval"] = 900
     conf["params"]["graph_dump_interval"] = 60
     conf["params"]["min_top_score"] = 10
     conf["params"]["min_tweets_for_suspicious"] = 10
@@ -51,7 +61,6 @@ def init_params():
     conf["params"]["max_to_output"] = 250
     if test is True:
         conf["params"]["graph_dump_interval"] = 15
-        conf["params"]["serialization_interval"] = 60
         conf["params"]["purge_interval"] = 30
         conf["params"]["time_to_live"] = 60
     return
@@ -71,20 +80,20 @@ def init_config():
 
 def init_tweet_processor():
     debug_print(sys._getframe().f_code.co_name)
-    global output_dir, dump_dir, serialize_dir
+    global output_dir
     date_string = str(int(time.time()))
     output_dir = "captures/searches/" + date_string + "/"
-    dump_dir = "captures/searches/" + date_string + "/raw/"
-    serialize_dir = "captures/searches/" + date_string + "/serialized/"
-    directories = [output_dir, dump_dir, serialize_dir]
-    for dir in directories:
-        if not os.path.exists(dir):
-            os.makedirs(dir)
+    directories = [output_dir]
+    for d in directories:
+        if not os.path.exists(d):
+            print("Creating directory: " + d)
+            os.makedirs(d)
     shutil.copy2('config/searcher_targets.txt', output_dir)
-    deserialize_data()
     init_params()
     init_config()
     reload_settings()
+
+def set_counters():
     set_counter("dump_interval", conf["params"]["default_dump_interval"])
     set_counter("previous_dump_time", int(time.time()))
     set_counter("previous_graph_dump_time", int(time.time()))
@@ -238,61 +247,6 @@ def get_all_counters():
     debug_print(sys._getframe().f_code.co_name)
     return get_category_storage("statistics", "counters")
 
-###############
-# Serialization
-###############
-def serialize_variable(variable, filename):
-    debug_print(sys._getframe().f_code.co_name)
-    global serialize_dir
-    filename = serialize_dir + "/" + filename + ".json"
-    handle = open(filename, 'w')
-    json.dump(variable, handle, indent=4)
-    handle.close()
-    return
-
-def unserialize_variable(varname):
-    debug_print(sys._getframe().f_code.co_name)
-    global serialize_dir
-    if(os.path.exists(serialize_dir)):
-        filename = serialize_dir + "/" + varname + ".json"
-        if(os.path.exists(filename)):
-            handle = open(filename, 'r')
-            variable = json.load(handle)
-            handle.close()
-            return variable
-        else:
-            return
-    else:
-        return
-
-def serialize_data():
-    debug_print(sys._getframe().f_code.co_name)
-    debug_print("Serializing...")
-    global serialize_dir
-    tmp_dir = serialize_dir[:-1] + ".tmp"
-    old_dir = serialize_dir[:-1] + ".old"
-    if not os.path.exists(old_dir):
-        if os.path.exists(tmp_dir):
-            os.rename(tmp_dir, old_dir)
-        if os.path.exists(serialize_dir):
-            os.rename(serialize_dir, tmp_dir)
-            os.makedirs(serialize_dir)
-    serialize_variable(data, "data")
-    debug_print("Serialization finished...")
-    if os.path.exists(old_dir):
-        shutil.rmtree(old_dir)
-    return
-
-def deserialize_data():
-    debug_print(sys._getframe().f_code.co_name)
-    print "Deserializing data..."
-    global data
-    data = unserialize_variable("data")
-    if data is None:
-        data = {}
-    return
-
-
 ##################
 # Helper functions
 ##################
@@ -414,7 +368,6 @@ def cleanup():
     global dump_file_handle
     dump_file_handle.close()
     print "Serializing data..."
-    serialize_data()
 
 def dump_pie_chart(dirname, filename, title, data):
     debug_print(sys._getframe().f_code.co_name)
@@ -535,6 +488,56 @@ def reload_settings():
     conf["settings"]["url_keywords"] = read_config("config/url_keywords.txt")
     conf["settings"]["monitored_langs"] = read_config("config/languages.txt")
     conf["config"] = read_settings("config/settings.txt")
+
+def record_association(category, source, target):
+    debug_print(sys._getframe().f_code.co_name)
+    global associations
+    if category not in associations:
+        associations[category] = {}
+    if source is not None:
+        if source not in associations[category]:
+            associations[category][source] = {}
+        if target is not None:
+            if target not in associations[category][source]:
+                associations[category][source][target] = 1
+            else:
+                associations[category][source][target] += 1
+
+def dump_associations(category, dirname):
+    debug_print(sys._getframe().f_code.co_name)
+    if category in associations:
+        filename = os.path.join(dirname, "associations_" + category + ".json")
+        save_json(associations[category], filename)
+        filename = os.path.join(dirname, "associations_" + category + ".csv")
+        with io.open(filename, "w", encoding="utf-8") as handle:
+            handle.write(u"Source,Target,Weight\n")
+            for source, targets in sorted(associations[category].items()):
+                for target, count in sorted(targets.items()):
+                    if source != target and source is not None and target is not None:
+                        handle.write(source + u"," + target + u"," + unicode(count) + u"\n")
+
+def record_frequency_dist(category, item):
+    debug_print(sys._getframe().f_code.co_name)
+    global frequencies
+    if category not in frequencies:
+        frequencies[category] = {}
+    if item is not None:
+        if item not in frequencies[category]:
+            frequencies[category][item] = 1
+        else:
+            frequencies[category][item] += 1
+
+def dump_frequency_dist(category, dirname):
+    debug_print(sys._getframe().f_code.co_name)
+    if category in frequencies:
+        filename = os.path.join(dirname, "frequency_dist_" + category + ".json")
+        save_json(frequencies[category], filename)
+        filename = os.path.join(dirname, "frequency_dist_" + category + ".txt")
+        with io.open(filename, "w", encoding="utf-8") as handle:
+            for item, count in sorted(frequencies[category].items(), key=lambda x:x[1], reverse=True):
+                entry = unicode(count) + u"\t" + unicode(item) + u"\n"
+                handle.write(entry)
+
 
 ############################
 # Tweet data capture routine
@@ -707,15 +710,38 @@ def process_status(status):
     debug_print(sys._getframe().f_code.co_name)
     retweet = False
     reply = False
+    sn = status["screen_name"]
+    interacted_with = []
+    if "in_reply_to_screen_name" in status:
+        interacted_with.append(status["in_reply_to_screen_name"])
+    if "retweeted_screen_name" in status:
+        interacted_with.append(status["retweeted_screen_name"])
+    if "quote_tweeted_screen_name" in status:
+        interacted_with.append(status["quote_tweeted_screen_name"])
+    if "mentioned" in status:
+        for n in status["mentioned"]:
+            interacted_with.append(n)
+    unique_interactions = []
+    for n in interacted_with:
+        if n not in unique_interactions:
+            unique_interactions.append(n)
+            record_frequency_dist("all_users", sn)
+            record_frequency_dist(current_label + "_users", sn)
+            record_frequency_dist("all_users", n)
+            record_frequency_dist(current_label + "_users", n)
+            record_association("all_interactions", sn, n)
+            record_association(current_label + "_interactions", sn, n)
     if "retweet" in status:
         if status["retweet"] == True:
             retweet = True
-            record_tweet(status["text"], status["retweeted_screen_name"], status["retweeted_id"])
+            if "text" in status and "retweeted_screen_name" in status and "retweeted_id" in status:
+                record_tweet(status["text"], status["retweeted_screen_name"], status["retweeted_id"])
             record_per_minute("retweet_heatmap", status)
             record_chronology("retweeters", status)
             increment_counter("retweets")
     else:
-        record_tweet(status["text"], status["screen_name"], status["id_str"])
+        if "text" in status and "screen_name" in status and "id_str" in status:
+            record_tweet(status["text"], status["screen_name"], status["id_str"])
         record_per_minute("original_tweet_heatmap", status)
         record_chronology("original_tweets", status)
         increment_counter("original_tweets")
@@ -754,7 +780,6 @@ def dump_event():
         start_time = int(time.time())
         gathering_time = start_time - get_counter("previous_dump_time") - get_counter("dump_interval")
         dump_all()
-        serialize_data()
         end_time = int(time.time())
         processing_time = gathering_time
         print
@@ -799,10 +824,6 @@ if __name__ == '__main__':
         exit_correctly = True
 
     init_tweet_processor()
-    dump_filename = dump_dir + "raw.json"
-    full_dump_filename = dump_dir + "full.json"
-    dump_file_handle = open(dump_filename, "a")
-    full_dump_file_handle = open(full_dump_filename, "a")
 
     targets = read_config_unicode("config/searcher_targets.txt")
     if len(targets) > 0:
@@ -810,36 +831,55 @@ if __name__ == '__main__':
     else:
         print "Please add search targets in config/searcher_targets.txt"
         sys.exit(0)
-    if len(searches) != 1:
-        print "Please supply exactly one search."
-        sys.exit(0)
-    print "Search targets:"
-    print searches
+    print "Search targets: " + str(len(searches))
     script_start_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
-    acct_name, consumer_key, consumer_secret, access_token, access_token_secret = get_account_credentials()
-    t = Twarc(consumer_key, consumer_secret, access_token, access_token_secret)
-    print "Signing in as: " + acct_name
-    for status in t.search(searches):
-        captured_status = {}
-        increment_counter("tweets_encountered")
-        #json.dump(status, full_dump_file_handle)
-        full_dump_file_handle.write("\n")
-        if "lang" in status:
-            lang = status["lang"]
-            increment_counter("tweets_" + lang)
-            captured_status = capture_status_items(status)
-            process_status(captured_status)
-            if captured_status is not None:
-                increment_counter("tweets_captured")
-                increment_counter("tweets_processed")
-                increment_counter("tweets_processed_this_interval")
-                json.dump(captured_status, dump_file_handle)
-                dump_file_handle.write("\n")
-                periodic_events()
-            sys.stdout.write("#")
-            sys.stdout.flush()
-    dump_all()
-    serialize_data()
+    output_dir_base = output_dir
+    current_label = ""
+    data = {}
+    associations = {}
+    frequencies = {}
+    max_s = len(searches)
+    for count, search in enumerate(searches):
+        acct_name, consumer_key, consumer_secret, access_token, access_token_secret = get_account_sequential()
+        t = Twarc(consumer_key, consumer_secret, access_token, access_token_secret)
+        print "Signing in as: " + acct_name
+        search = "\"" + search + "\""
+        print(str(count) + "/" + str(max_s) + " searching: " + search)
+        current_label = "search_" + str(count)
+        output_dir = output_dir_base + str(count) + "/"
+        if not os.path.exists(output_dir):
+            print("Created directory: " + output_dir)
+            os.makedirs(output_dir)
+        fn = os.path.join(output_dir, "target.txt")
+        with open(fn, "w") as f:
+            f.write(search + "\n")
+        dump_filename = output_dir + "raw.json"
+        dump_file_handle = open(dump_filename, "a")
+        data = {}
+        set_counters()
+        for status in t.search(search):
+            captured_status = {}
+            increment_counter("tweets_encountered")
+            if "lang" in status:
+                lang = status["lang"]
+                increment_counter("tweets_" + lang)
+                captured_status = capture_status_items(status)
+                process_status(captured_status)
+                if captured_status is not None:
+                    increment_counter("tweets_captured")
+                    increment_counter("tweets_processed")
+                    increment_counter("tweets_processed_this_interval")
+                    dump_file_handle.write(json.dumps(captured_status))
+                    dump_file_handle.write("\n")
+                    periodic_events()
+                sys.stdout.write("#")
+                sys.stdout.flush()
+        dump_associations("all_interactions", output_dir_base)
+        dump_associations(current_label + "_interactions", output_dir)
+        dump_frequency_dist("all_users", output_dir_base)
+        dump_frequency_dist(current_label + "_users", output_dir)
+        dump_all()
+        dump_file_handle.close()
     print
     print "Done."
     print
