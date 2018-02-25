@@ -337,8 +337,11 @@ def summarize_cluster_map(tag_map, cluster_map):
     summaries = {}
     batch_len = 200
     filename = os.path.join(save_dir, "temp_summaries.json")
+    max_s = len(cluster_map)
+    count = 0
     for cluster, tweets in cluster_map.iteritems():
-        print(cluster + ": length: " + str(len(tweets)))
+        count += 1
+        print_progress(count, max_s)
         if len(tweets) > 2000:
             batched_sum = []
             batches = (tweets[i:i+batch_len] for i in range(0, len(tweets), batch_len))
@@ -403,7 +406,10 @@ def compare_lists(l1, l2):
 def compare_summaries(summaries):
     similar = []
     recorded = []
-    for comb in combinations(summaries.keys(), 2):
+    combs = combinations(summaries.keys(), 2):
+    max_s = len(combs)
+    for count, comb in enumerate(combs):
+        print_progress(count, max_s)
         n1 = comb[0]
         n2 = comb[1]
         if compare_lists(n1, n2) > 0.8:
