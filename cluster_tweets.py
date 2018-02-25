@@ -339,7 +339,7 @@ def summarize_cluster_map(tag_map, cluster_map):
     filename = os.path.join(save_dir, "temp_summaries.json")
     for cluster, tweets in cluster_map.iteritems():
         print(cluster + ": length: " + str(len(tweets)))
-        if len(tweets) > batch_len:
+        if len(tweets) > 2000:
             batched_sum = []
             batches = (tweets[i:i+batch_len] for i in range(0, len(tweets), batch_len))
             for b in batches:
@@ -421,7 +421,7 @@ def compare_summaries(summaries):
                 similar.append([n1, n2])
                 recorded.append(n1)
                 recorded.append(n2)
-    not_grouped = list(Set(summaries.keys() - Set(recorded)))
+    not_grouped = list(Set(summaries.keys()) - Set(recorded))
     for n in not_grouped:
         similar.append(n)
     return similar
@@ -457,6 +457,7 @@ def cluster_tweets(raw_input_file):
     filename = os.path.join(save_dir, "cluster_summaries.json")
     save_json(summaries, filename)
 
+    print("Looking for similar clusters.")
     similar = compare_summaries(summaries)
     filename = os.path.join(save_dir, "similar.json")
     save_json(similar, filename)
