@@ -406,13 +406,13 @@ def compare_lists(l1, l2):
 def compare_summaries(summaries):
     similar = []
     recorded = []
-    combs = combinations(summaries.keys(), 2):
+    combs = combinations(summaries.keys(), 2)
     max_s = len(combs)
     for count, comb in enumerate(combs):
         print_progress(count, max_s)
         n1 = comb[0]
         n2 = comb[1]
-        if compare_lists(n1, n2) > 0.8:
+        if compare_lists(n1, n2) > 0.5:
             found = False
             for index, entry in enumerate(similar):
                 if n1 in entry or n2 in entry:
