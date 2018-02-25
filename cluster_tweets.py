@@ -163,6 +163,8 @@ def process_sentences(processed):
     for count, sentence in enumerate(processed):
         print_progress(count + 1, num_sentences)
         tag_map[sentence] = process_sentence(sentence)
+    filename = os.path.join(save_dir, "g_labels.json")
+    save_json(g_labels, filename)
     return tag_map
 
 def get_freq_dist(tag_map):
@@ -436,9 +438,6 @@ def cluster_tweets(raw_input_file):
     filename = os.path.join(save_dir, "tag_map.json")
     tag_map = try_load_or_process(filename, process_sentences, processed)
 
-    filename = os.path.join(save_dir, "g_labels.json")
-    save_json(g_labels, filename)
-
     clusters = cluster(tag_map, processed)
     filename = os.path.join(save_dir, "clusters.json")
     save_json(clusters, filename)
@@ -449,7 +448,7 @@ def cluster_tweets(raw_input_file):
         for tweet in tweets:
             for tag in tag_map[tweet]:
                 if tag not in cluster_tags[cname]:
-                    cluster_tweets[cname].append(tag)
+                    cluster_tags[cname].append(tag)
     filename = os.path.join(save_dir, "cluster_tags.json")
     save_json(cluster_tags, filename)
 
