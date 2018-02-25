@@ -444,7 +444,7 @@ def cluster_tweets(raw_input_file):
     save_json(clusters, filename)
 
     cluster_tags = {}
-    for cname, tweets in clusters:
+    for cname, tweets in clusters.iteritems():
         cluster_tags[cname] = []
         for tweet in tweets:
             for tag in tag_map[tweet]:
