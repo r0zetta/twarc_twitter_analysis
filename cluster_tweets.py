@@ -469,7 +469,7 @@ def cluster_tweets(raw_input_file):
     save_json(summaries, filename)
 
     print("Looking for similar clusters.")
-    similar = compare_summaries(tag_map, summaries)
+    similar = compare_summaries(summaries)
     filename = os.path.join(save_dir, "similar.json")
     save_json(similar, filename)
 
