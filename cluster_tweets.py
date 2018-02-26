@@ -393,6 +393,8 @@ def counter_cosine_similarity(c1, c2):
     return dotprod / (magA * magB)
 
 def compare_lists(l1, l2):
+    if len(l1) < 1 or len(l2) < 1:
+        return 0.0
     l1exp = Counter()
     for itemstr in l1:
         for token in itemstr.split():
@@ -406,13 +408,14 @@ def compare_lists(l1, l2):
 def compare_summaries(summaries):
     similar = []
     recorded = []
-    combs = combinations(summaries.keys(), 2)
-    max_s = len(combs)
-    for count, comb in enumerate(combs):
-        print_progress(count, max_s)
+    scores = []
+    for comb in combinations(summaries.keys(), 2):
         n1 = comb[0]
         n2 = comb[1]
-        if compare_lists(n1, n2) > 0.5:
+        sim = compare_lists(summaries[n1], summaries[n2])
+        if sim > 0.6:
+            entry = [n1, n2, sim]
+            scores.append(entry)
             found = False
             for index, entry in enumerate(similar):
                 if n1 in entry or n2 in entry:
@@ -429,7 +432,9 @@ def compare_summaries(summaries):
                 recorded.append(n2)
     not_grouped = list(Set(summaries.keys()) - Set(recorded))
     for n in not_grouped:
-        similar.append(n)
+        similar.append([n])
+    filename = os.path.join(save_dir, "similarity_scores.json")
+    save_json(scores, filename)
     return similar
 
 def cluster_tweets(raw_input_file):
@@ -464,12 +469,19 @@ def cluster_tweets(raw_input_file):
     save_json(summaries, filename)
 
     print("Looking for similar clusters.")
-    similar = compare_summaries(summaries)
+    similar = compare_summaries(tag_map, summaries)
     filename = os.path.join(save_dir, "similar.json")
     save_json(similar, filename)
 
 
 
+def quick_compare():
+    print("Loading summaries")
+    summaries = load_json(os.path.join(save_dir, "cluster_summaries.json"))
+    print("Comparing summaries")
+    similar = compare_summaries(summaries)
+    filename = os.path.join(save_dir, "similar.json")
+    save_json(similar, filename)
 
 
 
@@ -506,6 +518,7 @@ if __name__ == '__main__':
         stopwords += extra_stopwords
 
     raw_input_file = os.path.join(input_dir, "tweets.txt")
+    #quick_compare()
     cluster_tweets(raw_input_file)
     test_predict()
 
