@@ -285,7 +285,13 @@ def process_tweet(status):
         return
     sn = status["user"]["screen_name"].lower()
     record_frequency_dist("tweeter_frequencies", sn)
-    text = status["text"]
+    text = None
+    if "full_text" in status:
+        text = status["full_text"]
+    elif "text" in status:
+        text = status["text"]
+    tweet_file_handle.write(text)
+
     if sn not in to_follow:
         record_frequency_dist("not_monitored", sn)
 
@@ -401,7 +407,8 @@ if __name__ == '__main__':
     stopword_file = load_json("corpus/stopwords-iso.json")
     all_stopwords = stopword_file["en"]
     all_stopwords += extra_stopwords
-
+    tweet_filename = os.path.join(save_dir, "tweets.txt")
+    tweet_file_handle = io.open(tweet_filename, "a", encoding="utf-8")
 
     twarc = Twarc(consumer_key, consumer_secret, access_token, access_token_secret)
 
