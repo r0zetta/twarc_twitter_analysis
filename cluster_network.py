@@ -44,18 +44,11 @@ def try_load_or_process(filename, processor_fn, function_arg):
         return ret
 
 def make_vocab(interactions):
-    names = []
-    max_s = len(interactions)
-    count = 1
+    names = set()
     for source, target_list in interactions.iteritems():
-        print_progress(count, max_s)
-        count += 1
+        names.add(source)
         for target, w in target_list.iteritems():
-            if len(target_list) > 0:
-                if source not in names:
-                    names.append(source)
-                if target not in names:
-                    names.append(target)
+            names.add(target)
     vocab = {}
     for index, n in enumerate(names):
         vocab[n] = index
