@@ -431,7 +431,12 @@ def get_network_params():
     nodes = 0
     if "user_user_interaction_count" in data:
         edges = sum([len(x) for x in data["user_user_interaction_count"].values()])
-        nodes = len([set(x) for x in data["user_user_interaction_count"].values()])
+        nodeset = set()
+        for source, targets in data["user_user_interaction_count"].iteritems():
+            nodeset.add(source)
+            for target, value in targets.iteritems():
+                nodeset.add(target)
+        nodes = len(nodeset)
     return nodes, edges
 
 def record_user_hashtag_interaction(username, hashtag):
