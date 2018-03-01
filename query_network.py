@@ -30,8 +30,8 @@ def get_mentioned(names, interactions):
 def get_mentions(names, interactions):
         ret = {}
         for name in names:
+            ret[name] = []
             if name in interactions:
-                ret[name] = []
                 for n, v in interactions[name].iteritems():
                     ret[name].append(n)
         return ret
