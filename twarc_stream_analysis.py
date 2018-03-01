@@ -3,6 +3,9 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from collections import Counter
 from itertools import combinations
 from twarc import Twarc
+from tweepy import OAuthHandler
+from tweepy import API
+from tweepy import Cursor
 from authentication_keys import get_account_credentials
 from datetime import datetime, date, time, timedelta
 from types import *
@@ -26,6 +29,7 @@ import string
 # Global variables
 ##################
 stopping = False
+follow = False
 restart = False
 threaded = True
 debug = False
@@ -498,6 +502,8 @@ def dump_counted_interactions(category):
                 if item1 != item2:
                     handle.write(unicode(item1) + u"," + unicode(item2) + u"," + unicode(count) + u"\n")
         handle.close()
+        filename = "data/raw/" + category + ".json"
+        save_json(data[category], filename)
 
 def dump_one_off_interactions(category):
     debug_print(sys._getframe().f_code.co_name)
@@ -1952,6 +1958,15 @@ def record_tweet_text(tweet):
             tweet_file_handle.write(u"\n")
     return
 
+def record_who_tweets_what(tweet, sn):
+    global data
+    if "who_tweets_what" not in data:
+        data["who_tweets_what"] = {}
+    if tweet not in data["who_tweets_what"]:
+        data["who_tweets_what"][tweet] = []
+    if sn not in data["who_tweets_what"][tweet]:
+        data["who_tweets_what"][tweet].append(sn)
+
 def add_timeline_data(date, name, action, item, twt_id):
     debug_print(sys._getframe().f_code.co_name)
     if name.lower() in conf["settings"]["monitored_users"]:
@@ -2661,6 +2676,11 @@ def dump_highly_retweeted():
     set_counter("highly_retweeted", total)
     set_counter("highest_retweeted", highest)
 
+def dump_who_tweets_what():
+    debug_print(sys._getframe().f_code.co_name)
+    if "who_tweets_what" in data:
+        filename = "data/raw/who_tweets_what.json"
+        save_json(data["who_tweets_what"], filename)
 
 ###################
 # Data dump routine
@@ -2736,6 +2756,7 @@ def dump_data():
     dump_retweeted_suspicious()
     dump_demographic_list()
     dump_demographic_detail()
+    dump_who_tweets_what()
 
     debug_print("Completed dump...")
     return
@@ -2776,6 +2797,8 @@ def process_tweet(status):
     info["name"] = status["screen_name"]
     if info["lang"] is None or info["name"] is None or info["text"] is None or info["tweet_id"] is None:
         return
+
+    record_who_tweets_what(info["text"], info["name"])
 
     if is_bot_name(info["name"]):
         info["bot_name"] = True
@@ -3820,14 +3843,47 @@ def process_status(status):
     sys.stdout.flush()
     return
 
+######################
+# Follow functionality
+######################
+def get_account_data_for_names(names):
+    print("Got " + str(len(names)) + " names.")
+    auth = OAuthHandler(consumer_key, consumer_secret)
+    auth.set_access_token(access_token, access_token_secret)
+    auth_api = API(auth)
+
+    batch_len = 100
+    batches = (names[i:i+batch_len] for i in range(0, len(names), batch_len))
+    ret = []
+    for batch_count, batch in enumerate(batches):
+        sys.stdout.write("#")
+        sys.stdout.flush()
+        users_list = auth_api.lookup_users(screen_names=batch)
+        users_json = (map(lambda t: t._json, users_list))
+        ret += users_json
+    return ret
+
+def get_ids_from_names(names):
+    ret = []
+    all_json = get_account_data_for_names(names)
+    for d in all_json:
+        if "id_str" in d:
+            id_str = d["id_str"]
+            ret.append(id_str)
+    return ret
+
+
+
 ##############
 # Process args
 ##############
 def process_args(args):
     debug_print(sys._getframe().f_code.co_name)
-    global restart, threaded, debug, test, collect_only
+    global restart, threaded, debug, test, collect_only, follow
     for arg in sys.argv:
         print "Got arg: " + arg
+        if "follow" in arg:
+            follow = True
         if "restart" in arg:
             restart = True
         if "threaded" in arg:
@@ -3858,9 +3914,14 @@ def start_thread():
 def get_tweet_stream(query):
     debug_print(sys._getframe().f_code.co_name)
     if query != "":
-        print "Search: " + query
-        for tweet in t.filter(track = query):
-            process_status(tweet)
+        if follow == True:
+            print "IDs: " + query
+            for tweet in t.filter(follow=query):
+                process_status(tweet)
+        else:
+            print "Search: " + query
+            for tweet in t.filter(track=query):
+                process_status(tweet)
     else:
         print "Getting 1% sample."
         for tweet in t.sample():
@@ -3898,12 +3959,28 @@ if __name__ == '__main__':
     t = Twarc(consumer_key, consumer_secret, access_token, access_token_secret)
     print "Signing in as: " + acct_name
     print "Preparing stream"
-    targets = read_config_unicode("config/targets.txt")
-    if len(targets) > 0:
-        searches = targets
     query = ""
-    if len(searches) > 0:
-        query = ",".join(searches)
+    if follow == True:
+        print("Listening to accounts")
+        to_follow = read_config_unicode("config/to_follow.txt")
+        to_follow = [x.lower() for x in to_follow]
+        id_list_file = "config/id_list.json"
+        id_list = []
+        if os.path.exists(id_list_file):
+            id_list = load_json(id_list_file)
+        if id_list is None or len(id_list) < 1:
+            print("Converting names to IDs")
+            id_list = get_ids_from_names(to_follow)
+            save_json(id_list, id_list_file)
+        print(" ID count: " + str(len(id_list)))
+        query = ",".join(id_list)
+    else:
+        print("Searching for keywords")
+        targets = read_config_unicode("config/targets.txt")
+        if len(targets) > 0:
+            searches = targets
+        if len(searches) > 0:
+            query = ",".join(searches)
     script_start_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
     while True:
         set_counter("successful_loops", 0)
