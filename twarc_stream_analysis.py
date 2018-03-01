@@ -425,6 +425,15 @@ def record_interaction_count(item1, item2, category):
     else:
         data[category][item1][item2] += 1
 
+def get_network_params():
+    debug_print(sys._getframe().f_code.co_name)
+    edges = 0
+    nodes = 0
+    if "user_user_interaction_count" in data:
+        edges = sum([len(x) for x in data["user_user_interaction_count"].values()])
+        nodes = len([set(x) for x in data["user_user_interaction_count"].values()])
+    return nodes, edges
+
 def record_user_hashtag_interaction(username, hashtag):
     debug_print(sys._getframe().f_code.co_name)
     #record_one_off_interaction(username, hashtag, "user_hashtag_interactions")
@@ -3711,6 +3720,8 @@ def dump_event():
         tps = float(float(get_counter("tweets_processed_this_interval"))/float(processing_time))
         set_counter("tweets_per_second_this_interval", tps)
         output += "Tweets per second: " + str("%.2f" % tps) + "\n"
+        nodes, edges = get_network_params()
+        output += "Nodes: " + str(nodes) + " Edges: " + str(edges) + "\n"
         set_counter("bot_tweets_this_interval", 0)
         set_counter("demographic_tweets_this_interval", 0)
         set_counter("tweets_processed_this_interval", 0)
