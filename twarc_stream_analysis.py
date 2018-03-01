@@ -40,6 +40,8 @@ searches = []
 tweet_queue = None
 analyzer = None
 targets = []
+to_follow = []
+ignore = []
 data = {}
 conf = {}
 acct_name = ""
@@ -447,6 +449,8 @@ def record_monitored_interactions(source, target):
 
 def record_user_user_interactions(source, target):
     debug_print(sys._getframe().f_code.co_name)
+    if source in conf["settings"]["ignore"] or target in conf["settings"]["ignore"]:
+        return
     #record_one_off_interaction(source, target, "user_user_interactions")
     record_interaction_count(source, target, "user_user_interaction_count")
 
@@ -1852,6 +1856,9 @@ def reload_settings():
     if "settings" not in conf:
         conf["settings"] = {}
     conf["settings"]["monitored_hashtags"] = read_config_unicode("config/monitored_hashtags.txt")
+    conf["settings"]["targets"] = read_config_unicode("config/targets.txt")
+    conf["settings"]["to_follow"] = read_config_unicode("config/to_follow.txt")
+    conf["settings"]["ignore"] = read_config_unicode("config/ignore.txt")
     conf["settings"]["keywords"] = read_config_unicode("config/keywords.txt")
     conf["settings"]["good_users"] = read_config("config/good_users.txt")
     conf["settings"]["bad_users"] = read_config("config/bad_users.txt")
