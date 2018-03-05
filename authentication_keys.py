@@ -71,8 +71,11 @@ def get_valid_accounts():
 
 def get_account_credentials():
     available_accounts, accounts = get_valid_accounts()
-# randomly choose an available account to start the stream on
-    chosen = random.randint(0, len(available_accounts) - 1)
+    num_available = len(available_accounts)
+    state = random.getstate()
+    random.seed(None)
+    chosen = (random.randrange(1, num_available) - 1)
+    random.setstate(state)
     acct_name = available_accounts[chosen]
     consumer_key = accounts[acct_name]["consumer_key"]
     consumer_secret = accounts[acct_name]["consumer_secret"]
