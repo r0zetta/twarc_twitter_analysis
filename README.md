@@ -1,4 +1,4 @@
-# twarc_twitter_analysis
+# twarc_twitter_analysis - DEPRECATED. Do not talk to me if you can't get this to work.
 Twitter analysis tools based on twarc and tweepy
 - all tools utilize authentication keys stored in the keys/ directory. Check the placeholder file here for an example of how to set it up
 - you can put multiple keys in that directory if you plan on using multiple scripts in parallel
